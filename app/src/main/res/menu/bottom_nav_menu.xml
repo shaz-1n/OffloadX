@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/navigation_upload"
+        android:icon="@android:drawable/ic_menu_upload"
+        android:title="Upload" />
+
+    <item
+        android:id="@+id/navigation_download"
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="Download" />
+
+    <item
+        android:id="@+id/navigation_stats"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="Statistics" />
+
+    <item
+        android:id="@+id/navigation_profile"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="Profile" />
+
+</menu>

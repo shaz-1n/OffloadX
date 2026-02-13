@@ -18,10 +18,9 @@ class UploadFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: SharedViewModel by activityViewModels()
 
-    // Keep track of the mode: "COMPOSITE" or "COMPLEX"
     private var selectedMode: String = "COMPOSITE"
 
-    // 1. Gallery Launcher (for Composite/Images)
+    // 1. Gallery Launcher (Composite)
     private val photoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
@@ -30,7 +29,7 @@ class UploadFragment : Fragment() {
         }
     }
 
-    // 2. File Explorer Launcher (for Complex/Documents)
+    // 2. File Explorer Launcher (Complex)
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -51,36 +50,53 @@ class UploadFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Set COMPOSITE Mode
+        // Automatically generate a Task ID when the screen opens
+        binding.etTaskId.setText("TASK_${System.currentTimeMillis() / 1000}")
+
+// If you want the Process ID to be random too:
+        binding.etProcessId.setText("PROC_${java.util.UUID.randomUUID().toString().take(8)}")
+
+        // --- MUTUAL EXCLUSION CHECKBOX LOGIC ---
+        binding.cbLocal.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.cbCloud.isChecked = false // Deselect Cloud
+            }
+        }
+
+        binding.cbCloud.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.cbLocal.isChecked = false // Deselect Local
+            }
+        }
+
+        // --- MODE SELECTION ---
         binding.btnModeComposite.setOnClickListener {
             selectedMode = "COMPOSITE"
             binding.tvFileStatus.text = "Mode: Composite (Gallery)"
-            Toast.makeText(context, "Gallery Mode Active", Toast.LENGTH_SHORT).show()
         }
 
-        // Set COMPLEX Mode
         binding.btnModeComplex.setOnClickListener {
             selectedMode = "COMPLEX"
             binding.tvFileStatus.text = "Mode: Complex (File Explorer)"
-            Toast.makeText(context, "File Explorer Mode Active", Toast.LENGTH_SHORT).show()
         }
 
-        // THE MAGNIFYING GLASS LOGIC
+        // --- MAGNIFYING GLASS LOGIC ---
         binding.btnSearchFile.setOnClickListener {
             if (selectedMode == "COMPOSITE") {
-                // Open Gallery for Images only
                 photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             } else {
-                // Open File Explorer for any document type
                 filePickerLauncher.launch(arrayOf("*/*"))
             }
         }
 
+        // --- UPLOAD BUTTON ---
         binding.btnFinalUpload.setOnClickListener {
             val title = binding.etTaskTitle.text.toString()
+            val location = if (binding.cbLocal.isChecked) "Local" else "Cloud"
+
             if (title.isNotEmpty()) {
-                viewModel.addTask(title, "Offload via $selectedMode")
-                Toast.makeText(context, "Uploading...", Toast.LENGTH_SHORT).show()
+                viewModel.addTask(title, "Mode: $selectedMode | Storage: $location")
+                Toast.makeText(context, "Task Sent to $location", Toast.LENGTH_SHORT).show()
             }
         }
     }

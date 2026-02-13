@@ -3,73 +3,116 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:gravity="center_horizontal">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Upload Task"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:gravity="center"
-            android:padding="16dp"
-            android:textColor="?attr/colorOnSurface"/>
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="24dp" />
+
+        <EditText
+            android:id="@+id/etTaskTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter Task Title"
+            android:layout_marginBottom="12dp" />
+
+        <EditText
+            android:id="@+id/etTaskDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter Description"
+            android:layout_marginBottom="16dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <Button android:id="@+id/btnComposite" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Composite"/>
-            <Button android:id="@+id/btnComplex" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Complex" android:layout_marginStart="8dp"/>
+            android:orientation="horizontal"
+            android:layout_marginBottom="24dp">
+
+            <Button
+                android:id="@+id/btnModeComposite"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="COMPOSITE"
+                android:backgroundTint="#26a69a"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/btnModeComplex"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="COMPLEX"
+                android:backgroundTint="#26a69a" />
         </LinearLayout>
 
         <EditText
             android:id="@+id/etTaskId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:hint="Task ID" />
+            android:hint="Task ID"
+            android:layout_marginBottom="16dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="10dp">
-            <CheckBox android:id="@+id/cbLocal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Local"/>
-            <CheckBox android:id="@+id/cbCloud" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cloud" android:layout_marginStart="20dp"/>
+            android:layout_marginBottom="16dp">
+            <CheckBox android:id="@+id/cbLocal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Local" />
+            <CheckBox android:id="@+id/cbCloud" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cloud" android:layout_marginStart="16dp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvProcessId"
+        <EditText
+            android:id="@+id/etProcessId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="#EEEEEE"
-            android:padding="10dp"
-            android:text="Process ID"/>
+            android:hint="Process ID"
+            android:background="#f0f0f0"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp" />
 
-        <LinearLayout
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical">
-            <TextView android:id="@+id/tvSelectedFileName" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="No file selected"/>
-            <ImageButton android:id="@+id/btnBrowse" android:layout_width="48dp" android:layout_height="48dp" android:src="@android:drawable/ic_menu_search"/>
-        </LinearLayout>
+            android:layout_marginBottom="24dp">
+
+            <TextView
+                android:id="@+id/tvFileStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No file selected"
+                android:layout_centerVertical="true"
+                android:textColor="#757575" />
+
+            <ImageButton
+                android:id="@+id/btnSearchFile"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:src="@android:drawable/ic_menu_search"
+                android:background="?attr/selectableItemBackground"
+                android:contentDescription="Search File" />
+        </RelativeLayout>
 
         <Button
             android:id="@+id/btnFinalUpload"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:layout_marginTop="20dp"
-            android:text="UPLOAD NOW" />
+            android:text="UPLOAD NOW"
+            android:backgroundTint="#26a69a"
+            android:textColor="@android:color/white" />
 
     </LinearLayout>
 </ScrollView>

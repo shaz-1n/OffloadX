@@ -1,110 +1,92 @@
 package com.example.offload
 
+import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.*
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import com.example.offload.TaskViewModel
+import com.example.offload.databinding.FragmentUploadBinding
 
-class UploadFragment : Fragment(R.layout.fragment_upload) {
+class UploadFragment : Fragment() {
 
-    private var currentTaskMode = "Composite"
-    private val usedTaskIds = mutableSetOf<String>()
+    private var _binding: FragmentUploadBinding? = null
+    private val binding get() = _binding!!
+    private val viewModel: SharedViewModel by activityViewModels()
 
-    private val viewModel: TaskViewModel by activityViewModels()
+    // Keep track of the mode: "COMPOSITE" or "COMPLEX"
+    private var selectedMode: String = "COMPOSITE"
+
+    // 1. Gallery Launcher (for Composite/Images)
+    private val photoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            binding.tvFileStatus.text = "${uris.size} Image(s) Selected"
+        }
+    }
+
+    // 2. File Explorer Launcher (for Complex/Documents)
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            binding.tvFileStatus.text = "File: ${it.lastPathSegment}"
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentUploadBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Initialize Views (Matching the new XML IDs)
-        val btnComposite = view.findViewById<Button>(R.id.btnComposite)
-        val btnComplex = view.findViewById<Button>(R.id.btnComplex)
-        val etTaskId = view.findViewById<EditText>(R.id.etTaskId)
-        val tvProcessId = view.findViewById<TextView>(R.id.tvProcessId) // Ensure this is TextView
-        val cbLocal = view.findViewById<CheckBox>(R.id.cbLocal)
-        val cbCloud = view.findViewById<CheckBox>(R.id.cbCloud)
-        val btnBrowse = view.findViewById<ImageButton>(R.id.btnBrowse)
-        val tvFileName = view.findViewById<TextView>(R.id.tvSelectedFileName)
-        val btnUpload = view.findViewById<Button>(R.id.btnFinalUpload)
-
-        // 2. Tab Selection Logic - Using backgroundTint instead of setBackgroundColor
-        // This prevents the "Button becomes a square box" and crash issue.
-        btnComposite.setOnClickListener {
-            currentTaskMode = "Composite"
-            btnComposite.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.teal_700)
-            btnComplex.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.grey_shadow)
-            Toast.makeText(context, "Mode: Images (Composite)", Toast.LENGTH_SHORT).show()
+        // Set COMPOSITE Mode
+        binding.btnModeComposite.setOnClickListener {
+            selectedMode = "COMPOSITE"
+            binding.tvFileStatus.text = "Mode: Composite (Gallery)"
+            Toast.makeText(context, "Gallery Mode Active", Toast.LENGTH_SHORT).show()
         }
 
-        btnComplex.setOnClickListener {
-            currentTaskMode = "Complex"
-            btnComplex.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.teal_700)
-            btnComposite.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.grey_shadow)
-            Toast.makeText(context, "Mode: All Files (Complex)", Toast.LENGTH_SHORT).show()
+        // Set COMPLEX Mode
+        binding.btnModeComplex.setOnClickListener {
+            selectedMode = "COMPLEX"
+            binding.tvFileStatus.text = "Mode: Complex (File Explorer)"
+            Toast.makeText(context, "File Explorer Mode Active", Toast.LENGTH_SHORT).show()
         }
 
-        // 3. Process ID Generator (Safe check)
-        etTaskId.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-                val id = s.toString()
-                tvProcessId.text = if (id.isNotEmpty()) "$id-OFFLOAD-PROC" else "Generated-ID"
-            }
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
-
-        // 4. Checkbox Logic
-        cbLocal.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) cbCloud.isChecked = false
-        }
-        cbCloud.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) cbLocal.isChecked = false
-        }
-
-        // 5. File Picker (Using theme-aware text color)
-        val getFile = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let {
-                tvFileName.text = it.lastPathSegment
-                // Use default theme text color instead of hardcoded Color.BLACK
-                tvFileName.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.tab_indicator_text))
+        // THE MAGNIFYING GLASS LOGIC
+        binding.btnSearchFile.setOnClickListener {
+            if (selectedMode == "COMPOSITE") {
+                // Open Gallery for Images only
+                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            } else {
+                // Open File Explorer for any document type
+                filePickerLauncher.launch(arrayOf("*/*"))
             }
         }
 
-        btnBrowse.setOnClickListener {
-            val mimeType = if (currentTaskMode == "Composite") "image/*" else "*/*"
-            getFile.launch(mimeType)
-        }
-
-        // 6. Validation
-        btnUpload.setOnClickListener {
-            val taskId = etTaskId.text.toString().trim()
-            val fileName = tvFileName.text.toString()
-            val isTypeSelected = cbLocal.isChecked || cbCloud.isChecked
-
-            when {
-                taskId.isEmpty() -> etTaskId.error = "Task ID is required"
-                usedTaskIds.contains(taskId) -> {
-                    etTaskId.error = "ID already exists!"
-                }
-                !isTypeSelected -> Toast.makeText(context, "Select Task Type", Toast.LENGTH_SHORT).show()
-                fileName == "No file selected" -> Toast.makeText(context, "Please select a file", Toast.LENGTH_SHORT).show()
-                else -> {
-                    usedTaskIds.add(taskId)
-                    viewModel.addTask()
-                    Toast.makeText(context, "Success: $taskId Uploaded", Toast.LENGTH_LONG).show()
-
-                    // Reset
-                    etTaskId.text.clear()
-                    tvFileName.text = "No file selected"
-                    cbLocal.isChecked = false
-                    cbCloud.isChecked = false
-                }
+        binding.btnFinalUpload.setOnClickListener {
+            val title = binding.etTaskTitle.text.toString()
+            if (title.isNotEmpty()) {
+                viewModel.addTask(title, "Offload via $selectedMode")
+                Toast.makeText(context, "Uploading...", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

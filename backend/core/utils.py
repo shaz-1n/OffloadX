@@ -4,6 +4,11 @@ import json
 import os
 from datetime import datetime
 from django.utils import timezone
+from PIL import Image
+import io
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.conf import settings
 
 # =============================================================================
 # OffloadX Computation Engine
@@ -34,6 +39,9 @@ def process_compute_task(data: dict, task_type: str) -> dict:
         result = _composite_processing(data)
     elif task_type == 'COMPLEX':
         result = _complex_processing(data)
+    elif task_type == 'IMAGE_GRAYSCALE':
+        # Data in this case is the file object itself
+        result = _process_image_grayscale(data)
     else:
         raise ValueError(f"Unknown task_type: {task_type}")
 
@@ -95,6 +103,42 @@ def _complex_processing(data: dict) -> dict:
     for i in range(int(iterations)):
         result += i * 0.5
     return {'computed_value': result, 'iterations': iterations}
+
+
+def _process_image_grayscale(file_obj) -> dict:
+    """
+    Handles IMAGE_GRAYSCALE tasks using Pillow.
+    Converts uploaded image to Black & White.
+    """
+    try:
+        # 1. Open image
+        image = Image.open(file_obj)
+        
+        # 2. Process (Grayscale)
+        processed_image = image.convert('L')
+        
+        # 3. Save to buffer
+        buffer = io.BytesIO()
+        processed_image.save(buffer, format=image.format or 'JPEG')
+        
+        # 4. Save to Media Storage
+        timestamp = int(time.time())
+        filename = f"processed_{timestamp}_{file_obj.name}"
+        path = default_storage.save(f"processed/{filename}", ContentFile(buffer.getvalue()))
+        
+        # 5. Return URL
+        # Assuming MEDIA_URL is set in settings.py
+        file_url = settings.MEDIA_URL + path
+        
+        return {
+            'status': 'success',
+            'original_name': file_obj.name,
+            'processed_url': file_url,
+            'mode': 'Grayscale',
+            'dimensions': f"{image.width}x{image.height}"
+        }
+    except Exception as e:
+        return {'error': str(e)}
 
 
 # =============================================================================

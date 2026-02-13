@@ -34,3 +34,12 @@ class ComputeRequestSerializer(serializers.Serializer):
     device_id = serializers.CharField(max_length=255)
     task_type = serializers.ChoiceField(choices=['COMPOSITE', 'COMPLEX'])
     data = serializers.JSONField(help_text="The payload to process (e.g., numbers, matrices, etc.)")
+
+
+class FileComputeRequestSerializer(serializers.Serializer):
+    """
+    Validates incoming file upload requests.
+    """
+    device_id = serializers.CharField(max_length=255)
+    file = serializers.FileField()
+    task_type = serializers.ChoiceField(choices=['IMAGE_GRAYSCALE'])

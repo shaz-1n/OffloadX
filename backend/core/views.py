@@ -3,8 +3,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import ComputeTask, ComputeLog
-from .serializers import ComputeTaskSerializer, ComputeRequestSerializer
+from .serializers import ComputeTaskSerializer, ComputeRequestSerializer, FileComputeRequestSerializer
 from .utils import process_compute_task, push_result_to_firebase
 
 
@@ -84,6 +85,59 @@ class ComputeView(APIView):
                 'status': 'FAILED',
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class FileComputeView(APIView):
+    """
+    POST /api/upload/
+    
+    Handles Multipart File Uploads (e.g., Images, CSVs).
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, format=None):
+        serializer = FileComputeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        device_id = serializer.validated_data['device_id']
+        task_type = serializer.validated_data['task_type'] # Should be IMAGE_GRAYSCALE
+        file_obj = serializer.validated_data['file']
+
+        # Create Task Record
+        task = ComputeTask.objects.create(
+            device_id=device_id,
+            task_type=task_type,
+            status='PROCESSING',
+            processing_started_at=timezone.now(),
+        )
+        task.save()
+
+        try:
+            # CALL THE LOGIC (Ported from yours)
+            # We pass the file_obj directly as 'data'
+            # Note: process_compute_task returns a wrapper with timing, but 
+            # for images, _process_image_grayscale returns specific keys.
+            # Let's adjust slightly:
+            compute_result = process_compute_task(file_obj, task_type)
+
+            task.status = 'COMPLETED'
+            task.completed_at = timezone.now()
+            task.processing_time_ms = compute_result.get('processing_time_ms', 0)
+            task.save()
+
+            return Response({
+                'task_id': str(task.id),
+                'status': 'COMPLETED',
+                'result': compute_result.get('result', compute_result), # Clean up hierarchy
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            task.status = 'FAILED'
+            task.error_message = str(e)
+            task.save()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class TaskStatusView(APIView):

@@ -30,13 +30,22 @@ This is the backend server for the OffloadX application, built with Django. It s
 
 ## API Endpoints
 
-### 1. Upload Task
+### 1. Upload Task (JSON)
+- **URL**: `/api/compute/`
+- **Method**: `POST`
+- **Body**: JSON
+    - `data`: Payload
+    - `task_type`: 'COMPOSITE' or 'COMPLEX'.
+
+### 2. Upload File (Image Processing)
 - **URL**: `/api/upload/`
 - **Method**: `POST`
-- **Body**: `multipart/form-data`
-    - `file`: The file to upload.
-    - `task_type`: (Optional) 'COMPOSITE' or 'COMPLEX'.
-- **Response**: JSON object with task details (ID, status).
+- **Content-Type**: `multipart/form-data`
+- **Body**:
+    - `file`: The image file.
+    - `task_type`: 'IMAGE_GRAYSCALE'
+    - `device_id`: Your Device ID.
+- **Response**: JSON with processed file URL.
 
 ### 2. Check Status
 - **URL**: `/api/status/<task_id>/`

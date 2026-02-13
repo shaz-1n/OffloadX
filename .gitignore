@@ -14,3 +14,28 @@
 .cxx
 local.properties
 .idea
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+db.sqlite3
+*.log
+
+# Media
+media/
+backend/media/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Firebase / Secrets
+serviceAccountKey.json
+google-services.json
+firebase-debug.log
+.vscode/

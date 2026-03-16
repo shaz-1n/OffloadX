@@ -3,59 +3,61 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:padding="16dp">
+    android:background="@color/bg_color"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center_horizontal"
+        android:padding="16dp"
         android:paddingBottom="40dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Upload Task"
-            android:textSize="28sp"
-            android:fontFamily="sans-serif-medium"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="24dp" />
-
+        <!-- Task Details Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardElevation="2dp"
+            app:strokeWidth="0dp"
             app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="?attr/colorSurface">
+            app:cardBackgroundColor="@color/card_color">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="16dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Task Details"
+                    android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginBottom="16dp"/>
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="12dp"/>
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Task Title"
+                    app:hintTextColor="@color/text_secondary"
+                    app:startIconDrawable="@android:drawable/ic_menu_edit"
+                    app:startIconTint="@color/text_secondary"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/input_stroke_color"
+                    app:boxBackgroundColor="@color/bg_color"
                     android:layout_marginBottom="12dp">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etTaskTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
                         android:inputType="text" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -63,49 +65,57 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Description (Optional)"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    app:hintTextColor="@color/text_secondary"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxStrokeColor="@color/input_stroke_color"
+                    app:boxBackgroundColor="@color/bg_color">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etTaskDesc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
                         android:inputType="textMultiLine"
-                        android:lines="3"
+                        android:lines="2"
                         android:gravity="top|start" />
                 </com.google.android.material.textfield.TextInputLayout>
-
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Configuration Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardElevation="2dp"
+            app:strokeWidth="0dp"
             app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="?attr/colorSurface">
+            app:cardBackgroundColor="@color/card_color">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="16dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Configuration"
+                    android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginBottom="16dp"/>
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="12dp"/>
 
-                <!-- Execution Mode -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Execution Mode"
-                    android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary_variant"
                     android:layout_marginBottom="8dp"/>
 
                 <LinearLayout
@@ -114,135 +124,227 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="16dp">
 
+                    <!-- Default active colors for Composite -->
                     <Button
                         android:id="@+id/btnModeComposite"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/Widget.Material3.Button"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
                         android:text="COMPOSITE"
-                        android:layout_marginEnd="8dp" />
+                        android:textColor="@color/white_color"
+                        app:backgroundTint="@color/primary_color"
+                        app:cornerRadius="8dp"
+                        android:layout_marginEnd="4dp" />
 
+                    <!-- Default inactive colors for Complex -->
                     <Button
                         android:id="@+id/btnModeComplex"
                         style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
-                        android:text="COMPLEX" />
+                        android:text="COMPLEX"
+                        android:textColor="@color/text_secondary"
+                        app:backgroundTint="@color/input_bg_color"
+                        app:cornerRadius="8dp"
+                        android:layout_marginStart="4dp"/>
                 </LinearLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="Task ID"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_marginBottom="16dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etTaskId"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="text" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- Processing Environment -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Processing Environment"
-                    android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginBottom="8dp"/>
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginBottom="16dp">
+                    
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="4dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Task ID"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary_variant"
+                            android:layout_marginBottom="4dp"/>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            app:boxCornerRadiusTopStart="8dp"
+                            app:boxCornerRadiusTopEnd="8dp"
+                            app:boxCornerRadiusBottomStart="8dp"
+                            app:boxCornerRadiusBottomEnd="8dp"
+                            app:boxStrokeWidth="0dp"
+                            app:boxBackgroundColor="@color/input_bg_color">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etTaskId"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="@color/text_secondary"
+                                android:paddingTop="12dp"
+                                android:paddingBottom="12dp"
+                                android:inputType="none"
+                                android:focusable="false"
+                                android:clickable="false" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="4dp">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Process ID"
+                            android:textSize="13sp"
+                            android:textColor="@color/text_primary_variant"
+                            android:layout_marginBottom="4dp"/>
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                            app:boxCornerRadiusTopStart="8dp"
+                            app:boxCornerRadiusTopEnd="8dp"
+                            app:boxCornerRadiusBottomStart="8dp"
+                            app:boxCornerRadiusBottomEnd="8dp"
+                            app:boxStrokeWidth="0dp"
+                            app:boxBackgroundColor="@color/input_bg_color">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etProcessId"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="@color/text_secondary"
+                                android:paddingTop="12dp"
+                                android:paddingBottom="12dp"
+                                android:inputType="none"
+                                android:focusable="false"
+                                android:clickable="false" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Processing Environment"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary_variant"
+                    android:layout_marginBottom="8dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
                     <com.google.android.material.checkbox.MaterialCheckBox
                         android:id="@+id/cbLocal"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Local Storage" />
+                        android:text="Local Storage"
+                        android:textColor="@color/text_primary"
+                        app:buttonTint="@color/primary_color"/>
                     <com.google.android.material.checkbox.MaterialCheckBox
                         android:id="@+id/cbCloud"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Cloud Offload"
+                        android:textColor="@color/text_primary"
+                        app:buttonTint="@color/primary_color"
                         android:layout_marginStart="16dp" />
                 </LinearLayout>
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Edge Node (Laptop) IP"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary_variant"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="4dp"/>
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Process ID"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    app:boxBackgroundColor="?attr/colorSurfaceVariant"
-                    android:layout_marginBottom="8dp">
+                    app:boxCornerRadiusTopStart="8dp"
+                    app:boxCornerRadiusTopEnd="8dp"
+                    app:boxCornerRadiusBottomStart="8dp"
+                    app:boxCornerRadiusBottomEnd="8dp"
+                    app:boxStrokeWidth="0dp"
+                    app:boxBackgroundColor="@color/input_bg_color">
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etProcessId"
+                        android:id="@+id/etHubIp"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="text" />
+                        android:textSize="14sp"
+                        android:textColor="@color/text_secondary"
+                        android:hint="e.g. 192.168.1.5:8000"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:inputType="textUri" />
                 </com.google.android.material.textfield.TextInputLayout>
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- File Selection Zone -->
+        <!-- Big select file container (Replaces small search file icon) -->
+        <!-- Needs id btnSearchFile so UploadFragment.kt still works -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnSearchFile"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:layout_height="120dp"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
             app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline"
-            app:cardCornerRadius="12dp"
-            app:cardBackgroundColor="?attr/colorSurface">
-
-            <RelativeLayout
+            app:strokeWidth="2dp"
+            app:strokeColor="@color/primary_color"
+            app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="@color/bg_color">
+            
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp">
-
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center">
+                
                 <ImageView
-                    android:id="@+id/ic_file"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_centerVertical="true"
-                    android:src="@android:drawable/ic_menu_gallery"
-                    app:tint="?attr/colorPrimary"
-                    android:layout_marginEnd="16dp"/>
-
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/stat_sys_upload"
+                    app:tint="@color/primary_color"
+                    android:layout_marginBottom="8dp"/>
                 <TextView
                     android:id="@+id/tvFileStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_toEndOf="@id/ic_file"
-                    android:layout_toStartOf="@id/btnSearchFile"
-                    android:text="No file selected for upload"
-                    android:layout_centerVertical="true"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                <ImageButton
-                    android:id="@+id/btnSearchFile"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:src="@android:drawable/ic_menu_search"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    app:tint="?attr/colorPrimary"
-                    android:contentDescription="Search File" />
-            </RelativeLayout>
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:text="Select File for Upload"
+                    android:gravity="center" />
+            </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <Button
             android:id="@+id/btnFinalUpload"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="56dp"
             android:text="Start Upload Process"
+            android:textColor="@color/white_color"
             android:textSize="16sp"
-            app:cornerRadius="12dp" />
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            app:backgroundTint="@color/primary_color" />
+            
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
 
     </LinearLayout>
 </ScrollView>

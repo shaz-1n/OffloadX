@@ -11,7 +11,10 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.firebase.auth.FirebaseAuth
 import android.widget.Toast
+import android.net.Uri
+import androidx.activity.viewModels
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,48 +39,30 @@ class MainActivity : AppCompatActivity() {
         val toolbar: androidx.appcompat.widget.Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         setupActionBarWithNavController(navController)
+
+        // 5. Handle Phase 1 Direct Redirection (Intent filters)
+        handleIntent(intent)
     }
 
-    // This creates the "three dots" menu in the top right
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
     }
 
-    // This is the "Engine" that makes Change Password and Logout work
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.nav_change_password -> {
-                try {
-                    navController.navigate(R.id.changePasswordFragment)
-                } catch (e: Exception) {
-                    Toast.makeText(this, "Navigation Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-                true
-            }
-            R.id.nav_logout -> {
-                showLogoutConfirmation()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND) {
+             val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+             if (uri != null) {
+                  val viewModel: SharedViewModel by viewModels()
+                  viewModel.setSharedUri(uri)
+                  
+                  // Make sure we end up on the Upload tab if we aren't there
+                  navController.navigate(R.id.navigation_upload)
+             }
         }
     }
 
-    // The logic to close the app and go back to Login
-    private fun showLogoutConfirmation() {
-        AlertDialog.Builder(this)
-            .setTitle("Logout")
-            .setMessage("Are you sure you want to exit?")
-            .setPositiveButton("Yes") { _, _ ->
-                // This clears the activity stack so the user can't press 'back' to return
-                val intent = Intent(this, LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-                finish()
-            }
-            .setNegativeButton("No", null)
-            .show()
-    }
+
 
     // Makes the "Back" arrow in the top left work
     override fun onSupportNavigateUp(): Boolean {

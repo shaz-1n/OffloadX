@@ -1,45 +1,56 @@
 package com.example.offload
 
 import android.os.Bundle
+import android.util.Patterns
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.firebase.auth.FirebaseAuth
 
 class ForgotPasswordActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_forgot_password)
 
-        // 1. Initialize your views (This fixes the red text)
-        // Ensure these IDs match your activity_forgot_password.xml exactly!
-        val etEmail = findViewById<EditText>(R.id.etEmail)
+        val etEmail  = findViewById<EditText>(R.id.etEmail)
         val btnReset = findViewById<Button>(R.id.btnReset)
 
-        // 2. Set the click listener
         btnReset.setOnClickListener {
-            val email = etEmail.text.toString()
-            if (email.isNotEmpty()) {
-                // Generate a random 6-character password for the wireframe
-                val randomPass = (100000..999999).random().toString()
+            val email = etEmail.text.toString().trim()
 
-                // Show a Toast simulating the email being sent
-                Toast.makeText(this, "Credentials sent to $email\nTemp Pass: $randomPass", Toast.LENGTH_LONG).show()
-
-                // Return to Login Screen after 5 seconds
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    finish()
-                }, 5000)
-            } else {
+            // Validation
+            if (email.isEmpty()) {
                 etEmail.error = "Please enter your registered email"
+                return@setOnClickListener
             }
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                etEmail.error = "Enter a valid email address"
+                return@setOnClickListener
+            }
+
+            // Firebase: Send password reset email
+            btnReset.isEnabled = false
+            btnReset.text = "Sending..."
+
+            FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(this,
+                            "Password reset email sent to $email. Check your inbox!",
+                            Toast.LENGTH_LONG).show()
+                        finish()
+                    } else {
+                        val error = task.exception?.message ?: "Failed to send reset email"
+                        Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                    }
+                    btnReset.isEnabled = true
+                    btnReset.text = "Reset Password"
+                }
         }
 
-        // Apply window insets (Ensures R.id.main exists in activity_forgot_password.xml)
         val mainView = findViewById<android.view.View>(R.id.main)
         if (mainView != null) {
             ViewCompat.setOnApplyWindowInsetsListener(mainView) { v, insets ->

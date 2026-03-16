@@ -19,6 +19,10 @@ class OTPActivity : AppCompatActivity() {
         val btnVerify = findViewById<Button>(R.id.btnVerify)
 
         btnVerify.setOnClickListener {
+            // Save registration status
+            val prefs = getSharedPreferences("OffloadXPrefs", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("is_registered", true).apply()
+
             // In a skeleton, we simulate success
             Toast.makeText(this, "Account Verified Successfully!", Toast.LENGTH_SHORT).show()
 

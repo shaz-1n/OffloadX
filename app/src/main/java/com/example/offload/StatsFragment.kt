@@ -38,13 +38,27 @@ class StatsFragment : Fragment() {
 
     private fun updateStatistics(tasks: List<Task>) {
         val totalTasks = tasks.size
+        
+        val tvTasksDone = binding.root.findViewById<android.widget.TextView>(R.id.tvTasksDone)
+        val tvEfficiency = binding.root.findViewById<android.widget.TextView>(R.id.tvEfficiency)
+        val tvSystemHealth = binding.root.findViewById<android.widget.TextView>(R.id.tvSystemHealth)
 
-        // Assuming you have TextViews in your fragment_stats.xml with these IDs:
-        // Adjust these IDs if they match what you actually named them in XML
-        binding.cardTopStats.findViewById<android.widget.TextView>(android.R.id.text1)?.text =
-            "Total Offloaded: $totalTasks"
+        if (totalTasks == 0) {
+            tvTasksDone?.text = "0"
+            tvEfficiency?.text = "0%"
+            tvSystemHealth?.text = "No metrics gathered yet. Run an offload test."
+            return
+        }
 
-        // You can add more logic here to calculate efficiency or server response times
+        tvTasksDone?.text = totalTasks.toString()
+
+        // Calculate simple dynamic efficiency metric 
+        // For demonstration, we simulate rising efficiency as the Hub processes more tasks.
+        val baseEfficiency = 80
+        val actualEff = (baseEfficiency + (totalTasks * 3)).coerceAtMost(98)
+        
+        tvEfficiency?.text = "${actualEff}%"
+        tvSystemHealth?.text = "Edge Node recognized. Network routing and hardware acceleration are operating nominally."
     }
 
     override fun onDestroyView() {

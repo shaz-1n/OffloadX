@@ -105,6 +105,15 @@ class FileComputeView(APIView):
         task_type = serializer.validated_data['task_type'] # Should be IMAGE_GRAYSCALE
         file_obj = serializer.validated_data['file']
 
+        print("\n" + "="*70)
+        print(f"🚀 [OFFLOAD-X EDGE NODE] INCOMING OFFLOAD OVER WIFI DETECTED!")
+        print("="*70)
+        print(f"📱 Source Device : {device_id}")
+        print(f"📦 Payload Size  : {round(file_obj.size / 1048576, 2)} MB")
+        print(f"📄 File Name     : {file_obj.name}")
+        print(f"⚙️ Task Type     : {task_type} (Dynamic Heavy Compute)")
+        print("-" * 70)
+
         # Create Task Record
         task = ComputeTask.objects.create(
             device_id=device_id,
@@ -126,6 +135,10 @@ class FileComputeView(APIView):
             task.completed_at = timezone.now()
             task.processing_time_ms = compute_result.get('processing_time_ms', 0)
             task.save()
+            
+            print(f"✅ [SUCCESS] Edge Node Computation finished in {task.processing_time_ms} ms")
+            print(f"📤 Transmitting Computed Result back to Android Device...")
+            print("="*70 + "\n")
 
             return Response({
                 'task_id': str(task.id),
@@ -137,6 +150,10 @@ class FileComputeView(APIView):
             task.status = 'FAILED'
             task.error_message = str(e)
             task.save()
+            
+            print(f"❌ [FAILED] Computation Error: {str(e)}")
+            print("="*70 + "\n")
+            
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -122,7 +122,7 @@ class UploadFragment : Fragment() {
         // --- MAGNIFYING GLASS LOGIC ---
         binding.btnSearchFile.setOnClickListener {
             if (selectedMode == "COMPOSITE") {
-                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
             } else {
                 filePickerLauncher.launch(arrayOf("*/*"))
             }
@@ -176,6 +176,7 @@ class UploadFragment : Fragment() {
                 
                 var routeDuration = System.currentTimeMillis() - start
                 var executionStatusMsg = "Decided Route"
+                var finalProcessedUrl = ""
 
                 if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
                     val client = HubOffloadClient(requireContext())
@@ -186,6 +187,7 @@ class UploadFragment : Fragment() {
                     
                     if (offloadResponse.success) {
                         executionStatusMsg = "[Success] Backend Offload ms: $routeDuration"
+                        finalProcessedUrl = offloadResponse.resultMsg ?: ""
                     } else {
                         executionStatusMsg = "[Failed] ${offloadResponse.errorMessage}"
                     }
@@ -206,6 +208,30 @@ class UploadFragment : Fragment() {
                     
                     viewModel.addTask(title, logStr)
                     
+                    // --- DYNAMICALLY ADD TO DOWNLOADS TAB ---
+                    val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
+                    
+                    // Since Video Analytics generates a Peak Insight JPG overlay, force it down to Image type
+                    var prettyFileType = "doc"
+                    var extStr = ""
+                    
+                    if (mimeType.contains("video") || mimeType.contains("image")) {
+                        prettyFileType = "image"
+                        extStr = ".jpg"
+                    }
+                    
+                    val today = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+                    
+                    viewModel.addFile(
+                        FileModel(
+                            fileName = "$title (Processed)$extStr",
+                            fileSize = "${"%.2f".format(actualFileSizeMB)} MB",
+                            fileDate = today,
+                            fileType = prettyFileType,
+                            processedUrl = finalProcessedUrl
+                        )
+                    )
+                    
                     if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
                          binding.cbCloud.isChecked = true
                     } else {
@@ -223,13 +249,6 @@ class UploadFragment : Fragment() {
     private fun analyzeFile(uri: Uri) {
         // 1. Basic checks
         val mimeType = requireContext().contentResolver.getType(uri) ?: ""
-        
-        // Block unsupported large formats like .mkv
-        if (mimeType.contains("video/x-matroska") || mimeType.contains("mkv")) {
-             Toast.makeText(context, "Unsupported file format. Please upload Images/Docs.", Toast.LENGTH_LONG).show()
-             selectedUri = null
-             return
-        }
 
         // 2. Safely extract file size
         requireContext().contentResolver.query(uri, null, null, null, null)?.use { cursor ->

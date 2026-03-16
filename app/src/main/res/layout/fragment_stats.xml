@@ -59,6 +59,7 @@
                     android:orientation="vertical"
                     android:gravity="center">
                     <TextView
+                        android:id="@+id/tvEfficiency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="92%"
@@ -80,6 +81,7 @@
                     android:orientation="vertical"
                     android:gravity="center">
                     <TextView
+                        android:id="@+id/tvTasksDone"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="14"
@@ -126,6 +128,7 @@
                 android:layout_marginBottom="8dp"/>
                 
             <TextView
+                android:id="@+id/tvSystemHealth"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="?attr/colorOnSurfaceVariant"

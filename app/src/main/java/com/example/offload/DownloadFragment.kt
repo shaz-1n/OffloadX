@@ -3,30 +3,35 @@ package com.example.offload
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 class DownloadFragment : Fragment(R.layout.fragment_download) {
 
+    private val viewModel: SharedViewModel by activityViewModels()
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Find the RecyclerView by ID from fragment_download.xml
+        // 1. Find the RecyclerView by ID
         val rvFiles = view.findViewById<RecyclerView>(R.id.rvDownloadList)
-
-        // 2. Create your Mock Data (The list of files)
-        val files = listOf(
-            // fileName, fileSize, fileDate, fileType
-            FileModel("Project_Plan.pdf", "1.2 MB", "Oct 24, 2025", "pdf"),
-            FileModel("Vacation.jpg", "4.5 MB", "Oct 22, 2025", "image"),
-            FileModel("Budget.xlsx", "150 KB", "Oct 20, 2025", "doc")
-        )
-
-        // 3. Set the LayoutManager (Crucial: This is often why the screen is blank!)
         rvFiles.layoutManager = LinearLayoutManager(context)
 
-        // 4. Attach the Adapter
-        val adapter = FileAdapter(files)
-        rvFiles.adapter = adapter
+        // 2. Observe the files
+        viewModel.downloadableFiles.observe(viewLifecycleOwner) { files ->
+            if (files.isEmpty()) {
+                rvFiles.adapter = FileAdapter(listOf(
+                    FileModel("No Files Processed Yet", "Waiting for Edge Node", "-", "doc")
+                ))
+            } else {
+                val adapter = FileAdapter(
+                    files.toList(), 
+                    onDownloadSuccess = { url -> viewModel.markFileDownloaded(url) },
+                    onDeleteFile = { url -> viewModel.removeFile(url) }
+                )
+                rvFiles.adapter = adapter
+            }
+        }
     }
 }

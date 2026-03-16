@@ -41,8 +41,8 @@ class HubOffloadClient(private val context: Context) {
             connection.setRequestProperty("Connection", "Keep-Alive")
             connection.setRequestProperty("Cache-Control", "no-cache")
             connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=$boundary")
-            connection.connectTimeout = 30000
-            connection.readTimeout = 60000
+            connection.connectTimeout = 60000 // 60 seconds to connect over LAN
+            connection.readTimeout = 120000 // 2 straight minutes for Heavy Edge Compute execution
 
             val request = DataOutputStream(connection.outputStream)
 
@@ -90,8 +90,10 @@ class HubOffloadClient(private val context: Context) {
                 val json = JSONObject(responseBody)
                 val status = json.optString("status")
                 if (status == "COMPLETED") {
-                    val result = json.opt("result")?.toString() ?: "No result details"
-                    return@withContext OffloadResult(true, result, "Success")
+                    val resultObj = json.optJSONObject("result")
+                    val rawUrl = resultObj?.optString("processed_url") ?: ""
+                    val finalUrl = if (rawUrl.isNotEmpty()) baseUrl + rawUrl else ""
+                    return@withContext OffloadResult(true, finalUrl, "Success")
                 } else {
                     return@withContext OffloadResult(false, null, "Hub Backend Error: $responseBody")
                 }
@@ -106,8 +108,12 @@ class HubOffloadClient(private val context: Context) {
 
     private fun createTempFileFromUri(uri: Uri): File? {
         return try {
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-            val tempFile = File(context.cacheDir, "upload_temp_${System.currentTimeMillis()}")
+            val contentResolver = context.contentResolver
+            val mimeType = contentResolver.getType(uri) ?: ""
+            val ext = if (mimeType.contains("video")) ".mp4" else ".jpg"
+            
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val tempFile = File(context.cacheDir, "upload_temp_${System.currentTimeMillis()}$ext")
             val outputStream = FileOutputStream(tempFile)
             inputStream.copyTo(outputStream)
             inputStream.close()

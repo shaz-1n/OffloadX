@@ -3,39 +3,39 @@
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
     
-    <!-- Primary Brand Color: Teal -->
-    <color name="md_theme_light_primary">#26A69A</color>
+    <!-- Primary Brand Color: Maroon / Red -->
+    <color name="md_theme_light_primary">#BA1A1A</color>
     <color name="md_theme_light_onPrimary">#FFFFFF</color>
-    <color name="md_theme_light_primaryContainer">#7EFFF1</color>
-    <color name="md_theme_light_onPrimaryContainer">#00201D</color>
+    <color name="md_theme_light_primaryContainer">#FFDAD6</color>
+    <color name="md_theme_light_onPrimaryContainer">#410002</color>
 
-    <color name="md_theme_light_secondary">#4A635F</color>
+    <color name="md_theme_light_secondary">#775652</color>
     <color name="md_theme_light_onSecondary">#FFFFFF</color>
-    <color name="md_theme_light_secondaryContainer">#CCE8E2</color>
-    <color name="md_theme_light_onSecondaryContainer">#05201C</color>
+    <color name="md_theme_light_secondaryContainer">#FFDAD6</color>
+    <color name="md_theme_light_onSecondaryContainer">#2C1512</color>
 
     <color name="md_theme_light_error">#BA1A1A</color>
     <color name="md_theme_light_onError">#FFFFFF</color>
-    <color name="md_theme_light_background">#FAFDFB</color>
-    <color name="md_theme_light_onBackground">#191C1B</color>
-    <color name="md_theme_light_surface">#FAFDFB</color>
-    <color name="md_theme_light_onSurface">#191C1B</color>
+    <color name="md_theme_light_background">#FFFBFA</color>
+    <color name="md_theme_light_onBackground">#201A19</color>
+    <color name="md_theme_light_surface">#FFFBFA</color>
+    <color name="md_theme_light_onSurface">#201A19</color>
 
     <!-- Dark Theme Colors -->
-    <color name="md_theme_dark_primary">#5DE2D5</color>
-    <color name="md_theme_dark_onPrimary">#003732</color>
-    <color name="md_theme_dark_primaryContainer">#005049</color>
-    <color name="md_theme_dark_onPrimaryContainer">#7EFFF1</color>
+    <color name="md_theme_dark_primary">#FFB4AB</color>
+    <color name="md_theme_dark_onPrimary">#690005</color>
+    <color name="md_theme_dark_primaryContainer">#93000A</color>
+    <color name="md_theme_dark_onPrimaryContainer">#FFDAD6</color>
 
-    <color name="md_theme_dark_secondary">#B0CCC6</color>
-    <color name="md_theme_dark_onSecondary">#1C3531</color>
-    <color name="md_theme_dark_secondaryContainer">#334B47</color>
-    <color name="md_theme_dark_onSecondaryContainer">#CCE8E2</color>
+    <color name="md_theme_dark_secondary">#E7BDB8</color>
+    <color name="md_theme_dark_onSecondary">#442926</color>
+    <color name="md_theme_dark_secondaryContainer">#5D3F3C</color>
+    <color name="md_theme_dark_onSecondaryContainer">#FFDAD6</color>
 
     <color name="md_theme_dark_error">#FFB4AB</color>
     <color name="md_theme_dark_onError">#690005</color>
-    <color name="md_theme_dark_background">#191C1B</color>
-    <color name="md_theme_dark_onBackground">#E0E3E1</color>
-    <color name="md_theme_dark_surface">#191C1B</color>
-    <color name="md_theme_dark_onSurface">#E0E3E1</color>
+    <color name="md_theme_dark_background">#201A19</color>
+    <color name="md_theme_dark_onBackground">#EDE0DF</color>
+    <color name="md_theme_dark_surface">#201A19</color>
+    <color name="md_theme_dark_onSurface">#EDE0DF</color>
 </resources>

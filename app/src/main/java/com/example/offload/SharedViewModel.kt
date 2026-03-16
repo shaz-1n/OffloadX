@@ -14,4 +14,11 @@ class SharedViewModel : ViewModel() {
         currentList.add(Task(title = title, description = description))
         _tasks.value = currentList
     }
+
+    // Phase 1: Direct Redirection state to hold files shared into the app
+    val sharedUri = MutableLiveData<android.net.Uri?>()
+    
+    fun setSharedUri(uri: android.net.Uri?) {
+        sharedUri.value = uri
+    }
 }

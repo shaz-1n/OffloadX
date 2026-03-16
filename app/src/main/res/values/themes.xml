@@ -18,4 +18,8 @@
     <style name="CircleImage">
         <item name="cornerSize">50%</item>
     </style>
+
+    <style name="TransparentIndicator">
+        <item name="android:color">@android:color/transparent</item>
+    </style>
 </resources>

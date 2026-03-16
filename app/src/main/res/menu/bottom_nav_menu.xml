@@ -3,22 +3,22 @@
 
     <item
         android:id="@+id/navigation_upload"
-        android:icon="@android:drawable/ic_menu_upload"
+        android:icon="@drawable/ic_nav_upload"
         android:title="Upload" />
 
     <item
         android:id="@+id/navigation_download"
-        android:icon="@android:drawable/ic_menu_save"
+        android:icon="@drawable/ic_nav_download"
         android:title="Download" />
 
     <item
         android:id="@+id/navigation_stats"
-        android:icon="@android:drawable/ic_menu_compass"
+        android:icon="@drawable/ic_nav_stats"
         android:title="Statistics" />
 
     <item
         android:id="@+id/navigation_profile"
-        android:icon="@android:drawable/ic_menu_manage"
+        android:icon="@drawable/ic_nav_profile"
         android:title="Profile" />
 
 </menu>

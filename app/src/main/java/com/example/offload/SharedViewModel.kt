@@ -12,11 +12,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     private val prefs = application.getSharedPreferences("OffloadX_History", Context.MODE_PRIVATE)
 
-    // This list now automatically uses the Task.kt file we made
     private val _tasks = MutableLiveData<MutableList<Task>>(mutableListOf())
     val tasks: LiveData<MutableList<Task>> = _tasks
     
-    // Dynamic Download Files List
     private val _downloadableFiles = MutableLiveData<MutableList<FileModel>>(mutableListOf())
     val downloadableFiles: LiveData<MutableList<FileModel>> = _downloadableFiles
 
@@ -26,12 +24,11 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addTask(title: String, description: String) {
         val currentList = _tasks.value ?: mutableListOf()
-        currentList.add(0, Task(title = title, description = description)) // Add to top
+        currentList.add(0, Task(title = title, description = description))
         _tasks.value = currentList
         saveHistoryToDisk()
     }
 
-    // Phase 1: Direct Redirection state to hold files shared into the app
     val sharedUri = MutableLiveData<android.net.Uri?>()
     
     fun setSharedUri(uri: android.net.Uri?) {
@@ -40,7 +37,6 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addFile(file: FileModel) {
         val currentList = _downloadableFiles.value ?: mutableListOf()
-        // Add new files to the top of the list
         currentList.add(0, file)
         _downloadableFiles.value = currentList
         saveHistoryToDisk()
@@ -65,9 +61,20 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         saveHistoryToDisk()
     }
 
-    // --- PERSISTENCE LOGIC (Long Term Save on App Close) ---
+    fun removeFiles(urls: Set<String>) {
+        val currentList = _downloadableFiles.value ?: mutableListOf()
+        currentList.removeAll { it.processedUrl in urls }
+        _downloadableFiles.value = currentList
+        saveHistoryToDisk()
+    }
+
+    fun clearAllFiles() {
+        _downloadableFiles.value = mutableListOf()
+        saveHistoryToDisk()
+    }
+
+    // --- PERSISTENCE ---
     private fun saveHistoryToDisk() {
-        // Save Tasks
         val tasksArray = JSONArray()
         _tasks.value?.forEach { task ->
             val obj = JSONObject()
@@ -76,7 +83,6 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             tasksArray.put(obj)
         }
 
-        // Save Files
         val filesArray = JSONArray()
         _downloadableFiles.value?.forEach { file ->
             val obj = JSONObject()
@@ -86,6 +92,11 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             obj.put("fileType", file.fileType)
             obj.put("isDownloaded", file.isDownloaded)
             obj.put("processedUrl", file.processedUrl)
+            obj.put("description", file.description)
+            obj.put("processingTimeMs", file.processingTimeMs)
+            obj.put("dataSizeMB", file.dataSizeMB)
+            obj.put("taskType", file.taskType)
+            obj.put("timestamp", file.timestamp)
             filesArray.put(obj)
         }
 
@@ -119,7 +130,12 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                         fileDate = obj.getString("fileDate"),
                         fileType = obj.getString("fileType"),
                         isDownloaded = obj.optBoolean("isDownloaded", false),
-                        processedUrl = obj.optString("processedUrl", "")
+                        processedUrl = obj.optString("processedUrl", ""),
+                        description = obj.optString("description", ""),
+                        processingTimeMs = obj.optLong("processingTimeMs", 0L),
+                        dataSizeMB = obj.optDouble("dataSizeMB", 0.0),
+                        taskType = obj.optString("taskType", "COMPOSITE"),
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
                     )
                 )
             }

@@ -201,3 +201,63 @@ class HubHealthView(APIView):
                 'avg_processing_time_ms': avg_time,
             }
         })
+
+
+class SystemInfoView(APIView):
+    """
+    GET /api/system-info/
+    
+    Returns detailed hardware information about the Edge Node (laptop)
+    including disk space, CPU, GPU, and OS. The Android Stats dashboard
+    uses this to show real-time node health.
+    """
+    def get(self, request, format=None):
+        import platform
+        import shutil
+        import os
+
+        # Disk space
+        try:
+            total, used, free = shutil.disk_usage("/")
+            free_gb = round(free / (1024 ** 3), 1)
+            total_gb = round(total / (1024 ** 3), 1)
+            free_storage = f"{free_gb} GB"
+        except Exception:
+            free_storage = "Unknown"
+            free_gb = 0
+            total_gb = 0
+
+        # Processor
+        processor = platform.processor() or platform.machine() or "Unknown"
+        if len(processor) > 20:
+            processor = processor[:20] + "..."
+
+        # OS
+        os_info = f"{platform.system()} {platform.release()}"
+
+        # GPU detection
+        gpu = "None"
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=name', '--format=csv,noheader,nounits'],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                gpu = result.stdout.strip().split('\n')[0]
+        except Exception:
+            pass
+
+        # CPU count
+        cpu_count = os.cpu_count() or 0
+
+        return Response({
+            'status': 'online',
+            'free_storage': free_storage,
+            'total_storage': f"{total_gb} GB",
+            'processor': processor,
+            'cpu_cores': cpu_count,
+            'gpu': gpu,
+            'os': os_info,
+            'python_version': platform.python_version(),
+        })

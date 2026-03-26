@@ -71,8 +71,44 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         val ivProfilePic  = view.findViewById<ShapeableImageView>(R.id.ivProfilePic)
         val btnEditProfile = view.findViewById<LinearLayout>(R.id.btnEditProfileLayout)
         val btnDeleteAccount = view.findViewById<Button>(R.id.btnDeleteAccount)
+        
+        // Edge Node components
+        val btnSetHubIp = view.findViewById<LinearLayout>(R.id.btnSetHubIpLayout)
+        val tvCurrentHubIp = view.findViewById<TextView>(R.id.tvCurrentHubIp)
 
         val prefs = requireActivity().getSharedPreferences("OffloadXPrefs", android.content.Context.MODE_PRIVATE)
+
+        // --- Hub IP Configuration ---
+        val currentIp = prefs.getString("hub_ip", "192.168.1.100:8000")
+        tvCurrentHubIp.text = currentIp
+
+        btnSetHubIp.setOnClickListener {
+            val input = EditText(requireContext())
+            input.setText(tvCurrentHubIp.text.toString())
+            val container = LinearLayout(requireContext())
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.setMargins(60, 20, 60, 20)
+            input.layoutParams = params
+            container.addView(input)
+
+            AlertDialog.Builder(requireContext())
+                .setTitle("Set Edge Node IP")
+                .setMessage("Enter the IP address and port of your server (e.g., 192.168.42.129:8000)")
+                .setView(container)
+                .setPositiveButton("Save") { _, _ ->
+                    val newIp = input.text.toString().trim()
+                    if (newIp.isNotEmpty()) {
+                        prefs.edit().putString("hub_ip", newIp).apply()
+                        tvCurrentHubIp.text = newIp
+                        Toast.makeText(context, "Hub IP updated!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
 
         // --- Profile Picture Logic ---
         val savedUri = prefs.getString("pfp_uri", null)
@@ -129,15 +165,18 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         btnEditProfile.setOnClickListener {
             val input = EditText(requireContext())
             input.setText(tvUserName.text.toString())
-            val lp = LinearLayout.LayoutParams(
+            val container = LinearLayout(requireContext())
+            val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            input.layoutParams = lp
+            params.setMargins(60, 20, 60, 20)
+            input.layoutParams = params
+            container.addView(input)
 
             AlertDialog.Builder(requireContext())
                 .setTitle("Edit Display Name")
-                .setView(input)
+                .setView(container)
                 .setPositiveButton("Save") { _, _ ->
                     val newName = input.text.toString().trim()
                     if (newName.isNotEmpty() && user != null) {

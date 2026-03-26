@@ -143,6 +143,7 @@ class FileComputeView(APIView):
             return Response({
                 'task_id': str(task.id),
                 'status': 'COMPLETED',
+                'processing_time_ms': task.processing_time_ms,
                 'result': compute_result.get('result', compute_result), # Clean up hierarchy
             }, status=status.HTTP_200_OK)
 

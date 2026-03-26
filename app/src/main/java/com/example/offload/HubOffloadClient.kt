@@ -89,13 +89,14 @@ class HubOffloadClient(private val context: Context) {
             if (responseCode in 200..299 && responseBody.isNotEmpty()) {
                 val json = JSONObject(responseBody)
                 val status = json.optString("status")
+                val serverMs = json.optDouble("processing_time_ms", 0.0).toLong()
                 if (status == "COMPLETED") {
                     val resultObj = json.optJSONObject("result")
                     val rawUrl = resultObj?.optString("processed_url") ?: ""
                     val finalUrl = if (rawUrl.isNotEmpty()) baseUrl + rawUrl else ""
-                    return@withContext OffloadResult(true, finalUrl, "Success")
+                    return@withContext OffloadResult(true, finalUrl, "Success", serverMs)
                 } else {
-                    return@withContext OffloadResult(false, null, "Hub Backend Error: $responseBody")
+                    return@withContext OffloadResult(false, null, "Hub Backend Error: $responseBody", serverMs)
                 }
             } else {
                 return@withContext OffloadResult(false, null, "HTTP Error: $responseCode - $responseBody")
@@ -129,5 +130,6 @@ class HubOffloadClient(private val context: Context) {
 data class OffloadResult(
     val success: Boolean,
     val resultMsg: String?,
-    val errorMessage: String?
+    val errorMessage: String?,
+    val serverProcessingTimeMs: Long = 0L   // pure compute time on hub (ms)
 )

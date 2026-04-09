@@ -1,227 +1,208 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_color">
+    android:orientation="vertical"
+    android:background="#1A1A2E">
 
-    <!-- Top Header Row: Title + File Count + Search Icon + Sort Icon -->
-    <TextView
-        android:id="@+id/tvDownloadTitle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Edge Storage"
-        android:textSize="26sp"
-        android:fontFamily="sans-serif-medium"
-        android:textColor="@color/primary_color"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/tvFileCount"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="16dp"/>
-
-    <TextView
-        android:id="@+id/tvFileCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0 files"
-        android:textSize="14sp"
-        android:textColor="@color/text_secondary"
-        app:layout_constraintTop_toTopOf="@id/tvDownloadTitle"
-        app:layout_constraintBottom_toBottomOf="@id/tvDownloadTitle"
-        app:layout_constraintEnd_toStartOf="@id/btnSearch"
-        android:layout_marginEnd="12dp"/>
-
-    <!-- Search Icon (top-right) -->
-    <ImageButton
-        android:id="@+id/btnSearch"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_search"
-        android:contentDescription="Search"
-        app:layout_constraintTop_toTopOf="@id/tvDownloadTitle"
-        app:layout_constraintBottom_toBottomOf="@id/tvDownloadTitle"
-        app:layout_constraintEnd_toStartOf="@id/btnSortHeader"
-        android:layout_marginEnd="4dp"/>
-
-    <!-- Sort/Filter Icon (top-right) -->
-    <ImageButton
-        android:id="@+id/btnSortHeader"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:src="@drawable/ic_sort"
-        android:contentDescription="Sort"
-        app:layout_constraintTop_toTopOf="@id/tvDownloadTitle"
-        app:layout_constraintBottom_toBottomOf="@id/tvDownloadTitle"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginEnd="16dp"/>
-
-    <!-- Expandable Search Bar (HIDDEN by default) -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/searchCard"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:visibility="gone"
-        app:cardElevation="0dp"
-        app:cardCornerRadius="12dp"
-        app:cardBackgroundColor="@color/input_bg_color"
-        app:strokeWidth="0dp"
-        app:layout_constraintTop_toBottomOf="@id/tvDownloadTitle"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="4dp">
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@drawable/ic_search"
-                app:tint="@color/text_secondary"/>
-
-            <EditText
-                android:id="@+id/etSearch"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:hint="Search files..."
-                android:textSize="14sp"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_secondary"
-                android:background="@android:color/transparent"
-                android:inputType="text"
-                android:singleLine="true"
-                android:layout_marginStart="8dp"/>
-
-            <ImageButton
-                android:id="@+id/btnCloseSearch"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_close"
-                app:tint="@color/text_secondary"
-                android:contentDescription="Close Search"/>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Toolbar Row: Sort label (left) + Delete button + Grid/List toggle (right) -->
+    <!-- ══ HEADER: "Edge Storage" + count + 🔍 + ↕ ══ -->
     <LinearLayout
-        android:id="@+id/toolbar"
-        android:layout_width="0dp"
-        android:layout_height="36dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        app:layout_constraintTop_toBottomOf="@id/searchCard"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:paddingStart="20dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="22dp"
+        android:paddingBottom="6dp">
 
-        <!-- Sort label -->
+        <TextView
+            android:id="@+id/tvDownloadTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Edge Storage"
+            android:textSize="26sp"
+            android:fontFamily="sans-serif-medium"
+            android:textStyle="bold"
+            android:textColor="#2BC0A6"/>
+
+        <TextView
+            android:id="@+id/tvFileCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 files"
+            android:textSize="13sp"
+            android:textColor="#666680"
+            android:layout_marginEnd="2dp"/>
+
+        <!-- Search icon button -->
+        <ImageButton
+            android:id="@+id/btnSearch"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_search"
+            app:tint="#2BC0A6"
+            android:contentDescription="Search"/>
+
+        <!-- Sort icon button -->
+        <ImageButton
+            android:id="@+id/btnSortHeader"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_sort"
+            app:tint="#666680"
+            android:contentDescription="Sort"/>
+
+    </LinearLayout>
+
+    <!-- ══ SEARCH BAR (GONE by default, animates in on tap) ══ -->
+    <LinearLayout
+        android:id="@+id/searchCard"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="4dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/search_bar_bg"
+        android:visibility="gone">
+
         <ImageView
             android:layout_width="18dp"
             android:layout_height="18dp"
+            android:src="@drawable/ic_search"
+            app:tint="#666680"/>
+
+        <EditText
+            android:id="@+id/etSearch"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:hint="Search files..."
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666680"
+            android:background="@android:color/transparent"
+            android:inputType="text"
+            android:singleLine="true"
+            android:layout_marginStart="8dp"/>
+
+        <ImageButton
+            android:id="@+id/btnCloseSearch"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close"
+            app:tint="#666680"
+            android:contentDescription="Close Search"/>
+    </LinearLayout>
+
+    <!-- ══ TOOLBAR: sort label (left) + delete (hidden) + grid/list toggle (right) ══ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="10dp">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
             android:src="@drawable/ic_sort"
-            app:tint="@color/text_secondary"/>
+            app:tint="#666680"/>
 
         <TextView
             android:id="@+id/tvSortLabel"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="Recent"
             android:textSize="13sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginStart="6dp"/>
+            android:textColor="#666680"
+            android:layout_marginStart="6dp"
+            android:clickable="true"
+            android:focusable="true"/>
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1"/>
-
-        <!-- Delete Selected -->
+        <!-- Delete selected (hidden unless in selection mode) -->
         <ImageButton
             android:id="@+id/btnDeleteSelected"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_delete"
-            app:tint="@color/danger_color"
+            app:tint="#E53935"
             android:contentDescription="Delete Selected"
             android:visibility="gone"
-            android:layout_marginEnd="8dp"/>
+            android:layout_marginEnd="4dp"/>
 
-        <!-- View Toggle (Grid <-> List) -->
+        <!-- Grid / List Toggle -->
         <ImageButton
             android:id="@+id/btnToggleView"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_grid_view"
-            android:contentDescription="Toggle View"/>
+            app:tint="#2BC0A6"
+            android:contentDescription="Toggle Grid/List"/>
+
     </LinearLayout>
 
-    <!-- RecyclerView -->
+    <!-- ══ RECYCLERVIEW ══ -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvDownloadList"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="6dp"
+        android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="24dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toolbar" />
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="12dp"/>
 
-    <!-- Empty State -->
+    <!-- ══ EMPTY STATE ══ -->
     <LinearLayout
         android:id="@+id/emptyState"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:gravity="center"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/toolbar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:visibility="gone">
 
         <ImageView
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:src="@android:drawable/ic_menu_recent_history"
-            app:tint="@color/input_stroke_color"
-            android:layout_marginBottom="16dp"/>
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:src="@drawable/ic_nav_download"
+            app:tint="#333348"
+            android:layout_marginBottom="18dp"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="No processed files yet"
-            android:textSize="16sp"
-            android:textColor="@color/text_primary"
+            android:textSize="17sp"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Upload a file to the Edge Node to see results"
+            android:text="Upload a file to the Edge Node to see results here"
             android:textSize="13sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginTop="4dp"/>
+            android:textColor="#666680"
+            android:gravity="center"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
+            android:layout_marginTop="6dp"/>
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>

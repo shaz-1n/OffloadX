@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_checked="true" android:color="@color/primary_color" />
-    <item android:color="@color/text_secondary" />
+    <!-- Active / selected tab → teal -->
+    <item android:state_checked="true" android:color="#2BC0A6"/>
+    <!-- Inactive tabs → grey -->
+    <item android:color="#666680"/>
 </selector>

@@ -11,7 +11,6 @@ import android.content.Context
 import android.os.BatteryManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -24,6 +23,8 @@ import com.example.offload.databinding.FragmentUploadBinding
 
 class UploadFragment : Fragment() {
 
+    private lateinit var logRepo: OffloadLogRepository
+
     private var _binding: FragmentUploadBinding? = null
     private val binding get() = _binding!!
     private val viewModel: SharedViewModel by activityViewModels()
@@ -31,18 +32,18 @@ class UploadFragment : Fragment() {
     private var selectedMode: String = "COMPOSITE"
     private var selectedUri: Uri? = null
     private var actualFileSizeMB: Double = 0.0
+    private var lastLocalBenchmarkMs: Long = 0L
 
-    // 1. Gallery Launcher (Composite)
-    private val photoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            selectedUri = uris.first()
-            analyzeFile(selectedUri!!)
-        }
-    }
+    // Processing modes per file type (chosen by dialogs)
+    private var selectedImageMode: String = "GRAYSCALE"
+    private var selectedPdfMode: String = "ANALYZE"
+    private var selectedTextMode: String = "WORD_COUNT"
+    private var selectedVideoMode: String = "FACE_DETECTION"
 
-    // 2. File Explorer Launcher (Complex)
+    // Routing: true = Auto (decision engine), false = Manual
+    private var isAutoRouting: Boolean = true
+
+    // File picker launcher
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -64,6 +65,8 @@ class UploadFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        logRepo = OffloadLogRepository(requireContext())
+
         val prefs = requireActivity().getSharedPreferences("OffloadXPrefs", Context.MODE_PRIVATE)
         binding.etHubIp.setText(prefs.getString("hub_ip", "192.168.1.100:8000"))
 
@@ -78,57 +81,55 @@ class UploadFragment : Fragment() {
                 selectedUri = uri
                 binding.tvFileStatus.text = "Mode: Direct Redirection (Shared File)"
                 analyzeFile(uri)
-                // Consume the intent so it doesn't trigger again on rotation
                 viewModel.setSharedUri(null)
             }
         }
 
-        // --- MUTUAL EXCLUSION CHECKBOX LOGIC ---
+        // ── Routing Strategy Toggle ────────────────────────────────────────────
+        binding.btnRoutingAuto.setOnClickListener {
+            isAutoRouting = true
+            setRoutingUI(auto = true)
+        }
+
+        binding.btnRoutingManual.setOnClickListener {
+            isAutoRouting = false
+            setRoutingUI(auto = false)
+        }
+
+        // Manual sub-option: mutual exclusion between Local and Hub/Cloud
         binding.cbLocal.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                binding.cbCloud.isChecked = false // Deselect Cloud
+                binding.cbCloud.isChecked = false
+                binding.tvManualRouteInfo.text = "📱 Local: Process entirely on-device."
             }
         }
 
         binding.cbCloud.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                binding.cbLocal.isChecked = false // Deselect Local
+                binding.cbLocal.isChecked = false
+                binding.tvManualRouteInfo.text = "🖥️ Hub/Cloud: Send to edge node or cloud server."
             }
         }
 
-        // --- MODE SELECTION ---
+        // ── Execution Mode Buttons ─────────────────────────────────────────────
         binding.btnModeComposite.setOnClickListener {
             selectedMode = "COMPOSITE"
             binding.tvFileStatus.text = "Select File for Upload"
-            
-            binding.btnModeComposite.backgroundTintList = android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.primary_color))
-            binding.btnModeComposite.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_color))
-            
-            binding.btnModeComplex.backgroundTintList = android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.input_bg_color))
-            binding.btnModeComplex.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_secondary))
+            activateModeButton(composite = true)
         }
 
         binding.btnModeComplex.setOnClickListener {
             selectedMode = "COMPLEX"
             binding.tvFileStatus.text = "Select File for Upload"
-            
-            binding.btnModeComplex.backgroundTintList = android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.primary_color))
-            binding.btnModeComplex.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_color))
-            
-            binding.btnModeComposite.backgroundTintList = android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.input_bg_color))
-            binding.btnModeComposite.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_secondary))
+            activateModeButton(composite = false)
         }
 
-        // --- MAGNIFYING GLASS LOGIC ---
+        // ── File Picker ────────────────────────────────────────────────────────
         binding.btnSearchFile.setOnClickListener {
-            if (selectedMode == "COMPOSITE") {
-                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
-            } else {
-                filePickerLauncher.launch(arrayOf("*/*"))
-            }
+            filePickerLauncher.launch(arrayOf("*/*"))
         }
 
-        // --- UPLOAD BUTTON ---
+        // ── Upload Button ──────────────────────────────────────────────────────
         binding.btnFinalUpload.setOnClickListener {
             if (selectedUri == null) {
                 Toast.makeText(context, "Please select a file first", Toast.LENGTH_SHORT).show()
@@ -146,129 +147,397 @@ class UploadFragment : Fragment() {
                 binding.etHubIp.error = "IP Required for Hub"
                 return@setOnClickListener
             }
-            
-            // Save the configured IP globally
-            requireActivity().getSharedPreferences("OffloadXPrefs", Context.MODE_PRIVATE)
-                .edit().putString("hub_ip", ipAddress).apply()
 
-            // Real-time System Check Before Passing to Engine
-            val battery = getBatteryPercentage()
-            val netType = getNetworkType()
+            // Validate manual routing selection
+            if (!isAutoRouting && !binding.cbLocal.isChecked && !binding.cbCloud.isChecked) {
+                Toast.makeText(context, "Please select Local or Hub/Cloud in Manual mode", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
-            val engine = DecisionEngine()
-            val deviceId = "android_device_1"
-            val fileToUpload = selectedUri!!
-            
-            binding.btnFinalUpload.isEnabled = false
-            binding.btnFinalUpload.text = "Processing..."
-            
-            lifecycleScope.launch(Dispatchers.Default) {
-                val start = System.currentTimeMillis()
-                
-                // --- Pass REAL System State to Decision Engine ---
-                val decision = engine.decide(
+            val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
+            dispatchProcessingDialog(mimeType, title, ipAddress)
+        }
+    }
+
+    // ─── Routing UI helper ────────────────────────────────────────────────────
+
+    private fun setRoutingUI(auto: Boolean) {
+        val ctx = requireContext()
+        if (auto) {
+            binding.btnRoutingAuto.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.primary_color))
+            binding.btnRoutingAuto.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.white_color))
+            binding.btnRoutingManual.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.input_bg_color))
+            binding.btnRoutingManual.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary))
+            binding.tvAutoRouteInfo.visibility = View.VISIBLE
+            binding.layoutManualOptions.visibility = View.GONE
+        } else {
+            binding.btnRoutingManual.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.primary_color))
+            binding.btnRoutingManual.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.white_color))
+            binding.btnRoutingAuto.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.input_bg_color))
+            binding.btnRoutingAuto.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary))
+            binding.tvAutoRouteInfo.visibility = View.GONE
+            binding.layoutManualOptions.visibility = View.VISIBLE
+        }
+    }
+
+    private fun activateModeButton(composite: Boolean) {
+        val ctx = requireContext()
+        if (composite) {
+            binding.btnModeComposite.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.primary_color))
+            binding.btnModeComposite.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.white_color))
+            binding.btnModeComplex.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.input_bg_color))
+            binding.btnModeComplex.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary))
+        } else {
+            binding.btnModeComplex.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.primary_color))
+            binding.btnModeComplex.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.white_color))
+            binding.btnModeComposite.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.input_bg_color))
+            binding.btnModeComposite.setTextColor(
+                androidx.core.content.ContextCompat.getColor(ctx, R.color.text_secondary))
+        }
+    }
+
+    // ─── File-type-specific processing dialog dispatcher ─────────────────────
+
+    /**
+     * Detects the file type from MIME type and shows the appropriate
+     * processing-mode dialog (or goes directly for unknown types).
+     */
+    private fun dispatchProcessingDialog(mimeType: String, title: String, ipAddress: String) {
+        when {
+            mimeType.contains("image") -> showImageModeDialog { mode ->
+                selectedImageMode = mode
+                startUpload(title, ipAddress)
+            }
+            mimeType.contains("video") -> showVideoModeDialog { mode ->
+                selectedVideoMode = mode
+                startUpload(title, ipAddress)
+            }
+            mimeType.contains("pdf") -> showPdfModeDialog { mode ->
+                selectedPdfMode = mode
+                startUpload(title, ipAddress)
+            }
+            mimeType.contains("text") || mimeType.contains("json") ||
+            mimeType.contains("csv")  || mimeType.contains("xml") -> showTextModeDialog { mode ->
+                selectedTextMode = mode
+                startUpload(title, ipAddress)
+            }
+            else -> startUpload(title, ipAddress) // docx, xlsx, zip, etc.
+        }
+    }
+
+    // ─── Processing-mode dialogs ──────────────────────────────────────────────
+
+    private fun showImageModeDialog(onModeChosen: (String) -> Unit) {
+        val modeLabels = arrayOf(
+            "🌑  Grayscale",
+            "🔍  Object Detection (Face)",
+            "📐  Edge Detection",
+            "💧  Blur (Gaussian)",
+            "✨  Sharpen",
+            "🌅  Sepia",
+            "🔁  Invert (Negative)"
+        )
+        val modeValues = arrayOf(
+            "GRAYSCALE", "OBJECT_DETECTION", "EDGE_DETECT", "BLUR", "SHARPEN", "SEPIA", "INVERT"
+        )
+        var idx = modeValues.indexOf(selectedImageMode).takeIf { it >= 0 } ?: 0
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("🖼️ Choose Image Processing")
+            .setSingleChoiceItems(modeLabels, idx) { _, which -> idx = which }
+            .setPositiveButton("Process") { _, _ -> onModeChosen(modeValues[idx]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showVideoModeDialog(onModeChosen: (String) -> Unit) {
+        val modeLabels = arrayOf(
+            "🎯  Face Detection (AI — Best for demos)",
+            "📊  Frame Analytics (Edge density report)",
+            "🎞️  Thumbnail Extract (First clear frame)",
+            "🔁  Passthrough (Store + link)"
+        )
+        val modeValues = arrayOf(
+            "FACE_DETECTION", "FRAME_ANALYTICS", "THUMBNAIL", "PASSTHROUGH"
+        )
+        var idx = modeValues.indexOf(selectedVideoMode).takeIf { it >= 0 } ?: 0
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("🎬 Choose Video Processing")
+            .setSingleChoiceItems(modeLabels, idx) { _, which -> idx = which }
+            .setPositiveButton("Process") { _, _ -> onModeChosen(modeValues[idx]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showPdfModeDialog(onModeChosen: (String) -> Unit) {
+        val modeLabels = arrayOf(
+            "📄  Analyze (Word / page count + metadata)",
+            "🔍  Text Extract (Pull all readable text)",
+            "💾  Store & Link (Save original, return URL)"
+        )
+        val modeValues = arrayOf(
+            "ANALYZE", "TEXT_EXTRACT", "STORE"
+        )
+        var idx = modeValues.indexOf(selectedPdfMode).takeIf { it >= 0 } ?: 0
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("📑 Choose PDF Processing")
+            .setSingleChoiceItems(modeLabels, idx) { _, which -> idx = which }
+            .setPositiveButton("Process") { _, _ -> onModeChosen(modeValues[idx]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showTextModeDialog(onModeChosen: (String) -> Unit) {
+        val modeLabels = arrayOf(
+            "📊  Word Count (Words, lines, chars)",
+            "🔎  Keyword Frequency (Top-20 words)",
+            "📈  Sentiment Scan (Positive / Negative ratio)",
+            "💾  Store & Link (Save original, return URL)"
+        )
+        val modeValues = arrayOf(
+            "WORD_COUNT", "KEYWORD_FREQ", "SENTIMENT", "STORE"
+        )
+        var idx = modeValues.indexOf(selectedTextMode).takeIf { it >= 0 } ?: 0
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+            .setTitle("📝 Choose Text Processing")
+            .setSingleChoiceItems(modeLabels, idx) { _, which -> idx = which }
+            .setPositiveButton("Process") { _, _ -> onModeChosen(modeValues[idx]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ─── Core upload / routing logic ─────────────────────────────────────────
+
+    /**
+     * Determines the execution route (based on Auto/Manual selection and
+     * decision engine), then performs the upload or local processing.
+     */
+    private fun startUpload(title: String, ipAddress: String) {
+        requireActivity().getSharedPreferences("OffloadXPrefs", Context.MODE_PRIVATE)
+            .edit().putString("hub_ip", ipAddress).apply()
+
+        val battery = getBatteryPercentage()
+        val netType = getNetworkType()
+        val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
+        // Combine all chosen modes into a single extra param map
+        val chosenMode = resolveFileProcessingMode(mimeType)
+
+        val fileToUpload = selectedUri!!
+
+        binding.btnFinalUpload.isEnabled = false
+        binding.btnFinalUpload.text = "Processing..."
+
+        lifecycleScope.launch(Dispatchers.Default) {
+            val start = System.currentTimeMillis()
+            val taskStartMs = start
+
+            // ── Determine execution route ──────────────────────────────────────
+            val decision: ExecutionRoute = if (isAutoRouting) {
+                // Decision engine decides automatically
+                val engine = DecisionEngine()
+                engine.decide(
                     taskName = title,
                     dataSizeMB = actualFileSizeMB,
                     batteryPercent = battery,
                     networkType = netType,
-                    isCloudBackupNeeded = binding.cbCloud.isChecked
+                    isCloudBackupNeeded = false
                 )
-                
-                var routeDuration = System.currentTimeMillis() - start
-                var executionStatusMsg = "Decided Route"
-                var finalProcessedUrl = ""
+            } else {
+                // Manual: honour user checkbox
+                if (binding.cbCloud.isChecked) ExecutionRoute.HUB else ExecutionRoute.LOCAL
+            }
 
-                if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
-                    val client = HubOffloadClient(requireContext())
-                    // Task Type is HARDCODED TO IMAGE_GRAYSCALE mapped to backend processor for composite images
-                    val offloadResponse = client.offloadToHub(ipAddress, deviceId, "IMAGE_GRAYSCALE", fileToUpload)
-                    
-                    routeDuration = System.currentTimeMillis() - start
-                    
-                    if (offloadResponse.success) {
-                        executionStatusMsg = "[Success] Backend Offload ms: $routeDuration"
-                        finalProcessedUrl = offloadResponse.resultMsg ?: ""
-                    } else {
-                        executionStatusMsg = "[Failed] ${offloadResponse.errorMessage}"
-                    }
+            var routeDuration = System.currentTimeMillis() - start
+            var hubComputeTimeMs: Long = 0L
+            var executionStatusMsg = "Decided Route"
+            var finalProcessedUrl = ""
+
+            if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
+                val client = HubOffloadClient(requireContext())
+                val tier = if (decision == ExecutionRoute.CLOUD) "CLOUD" else "HUB"
+                val offloadResponse = client.offloadToHub(
+                    ipAddress, "android_device_1", "IMAGE_GRAYSCALE", fileToUpload, tier,
+                    imageMode   = selectedImageMode,
+                    pdfMode     = selectedPdfMode,
+                    textMode    = selectedTextMode,
+                    videoMode   = selectedVideoMode
+                )
+
+                routeDuration    = System.currentTimeMillis() - start
+                hubComputeTimeMs = offloadResponse.serverProcessingTimeMs
+
+                if (offloadResponse.success) {
+                    val tierLabel = if (tier == "CLOUD") "Cloud ☁" else "Hub 🖥"
+                    executionStatusMsg = "[$tierLabel ✓] Round-trip: ${routeDuration}ms | Server compute: ${hubComputeTimeMs}ms"
+                    finalProcessedUrl  = offloadResponse.resultMsg ?: ""
                 } else {
-                    // Simulating local processing wait
-                    Thread.sleep((actualFileSizeMB * 100).toLong().coerceAtLeast(300))
-                    routeDuration = System.currentTimeMillis() - start
-                    executionStatusMsg = "[Success] Fake Local Execution ms: $routeDuration"
+                    val tierLabel = if (tier == "CLOUD") "Cloud" else "Hub"
+                    executionStatusMsg = "[$tierLabel ✗] ${offloadResponse.errorMessage}"
+                }
+            } else {
+                // Local processing benchmark
+                val localStart = System.currentTimeMillis()
+                runLocalBenchmarkCompute()
+                val localDone = System.currentTimeMillis()
+                routeDuration           = localDone - localStart
+                lastLocalBenchmarkMs    = routeDuration
+                executionStatusMsg      = "[Local ✓] On-device compute: ${routeDuration}ms"
+            }
+
+            // ── Switch to Main thread to update UI ────────────────────────────
+            withContext(Dispatchers.Main) {
+                if (_binding == null) return@withContext   // fragment gone
+
+                binding.btnFinalUpload.isEnabled = true
+                binding.btnFinalUpload.text = "Start Upload Process"
+
+                val logStr = "Mode: $selectedMode | Route: $decision | " +
+                             "Size: ${"%.2f".format(actualFileSizeMB)}MB | Processing: $chosenMode\n$executionStatusMsg"
+
+                viewModel.addTask(title, logStr)
+
+                val dbNode = when (decision) {
+                    ExecutionRoute.LOCAL -> "LOCAL"
+                    ExecutionRoute.HUB   -> "HUB"
+                    ExecutionRoute.CLOUD -> "CLOUD"
                 }
 
-                // Switch back to Main Thread to update UI
-                withContext(Dispatchers.Main) {
-                    binding.btnFinalUpload.isEnabled = true
-                    binding.btnFinalUpload.text = "Start Upload Process"
+                // Determine what the server actually returned — prefer server result's file_type
+                // because e.g. video THUMBNAIL → image, FRAME_ANALYTICS → data, PASSTHROUGH → video
+                val (prettyFileType, extStr) = when {
+                    mimeType.contains("image")   -> Pair("image", ".jpg")
+                    mimeType.contains("video")   -> Pair("video", ".mp4")  // fixed from "image"
+                    mimeType.contains("pdf")     -> Pair("pdf",   ".pdf")
+                    mimeType.contains("text")    -> Pair("text",  ".txt")
+                    mimeType.contains("csv")     -> Pair("text",  ".csv")
+                    mimeType.contains("json")    -> Pair("text",  ".json")
+                    mimeType.contains("word") ||
+                    mimeType.contains("wordprocessingml") -> Pair("doc", ".docx")
+                    mimeType.contains("spreadsheetml") ||
+                    mimeType.contains("ms-excel")        -> Pair("doc", ".xlsx")
+                    else                         -> Pair("doc",  "")
+                }
 
-                    val logStr = "Mode: $selectedMode | Route: $decision | " +
-                                 "Size: ${"%.2f".format(actualFileSizeMB)}MB\n$executionStatusMsg"
-                    
-                    viewModel.addTask(title, logStr)
-                    
-                    // --- DYNAMICALLY ADD TO DOWNLOADS TAB ---
-                    val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
-                    
-                    // Since Video Analytics generates a Peak Insight JPG overlay, force it down to Image type
-                    var prettyFileType = "doc"
-                    var extStr = ""
-                    
-                    if (mimeType.contains("video") || mimeType.contains("image")) {
-                        prettyFileType = "image"
-                        extStr = ".jpg"
-                    }
-                    
-                    val today = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date())
-                    
-                    viewModel.addFile(
-                        FileModel(
-                            fileName = "$title (Processed)$extStr",
-                            fileSize = "${"%.2f".format(actualFileSizeMB)} MB",
-                            fileDate = today,
-                            fileType = prettyFileType,
-                            processedUrl = finalProcessedUrl
-                        )
+                val modeSuffix = " [$chosenMode]"
+                val today = java.text.SimpleDateFormat("MMM dd, yyyy",
+                    java.util.Locale.getDefault()).format(java.util.Date())
+                val recordedMs = if (hubComputeTimeMs > 0L) hubComputeTimeMs else routeDuration
+
+                viewModel.addFile(
+                    FileModel(
+                        fileName       = "$title (Processed)$modeSuffix$extStr",
+                        fileSize       = "${"%.2f".format(actualFileSizeMB)} MB",
+                        fileDate       = today,
+                        fileType       = prettyFileType,
+                        processedUrl   = finalProcessedUrl,
+                        processingTimeMs = recordedMs,
+                        dataSizeMB     = actualFileSizeMB,
+                        taskType       = selectedMode,
+                        executionNode  = dbNode
                     )
-                    
-                    if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
-                         binding.cbCloud.isChecked = true
-                    } else {
-                         binding.cbLocal.isChecked = true
-                    }
-                    
-                    Toast.makeText(context, executionStatusMsg, Toast.LENGTH_LONG).show()
+                )
+
+                // ── Log to SQLite ─────────────────────────────────────────────
+                val taskEndMs = System.currentTimeMillis()
+                val dbDataType = when (selectedMode) {
+                    "COMPOSITE"          -> "COMPOSITE"
+                    "COMPLEX"            -> "COMPLEX"
+                    "DIRECT REDIRECTION" -> "SIMPLE"
+                    else                 -> "COMPOSITE"
                 }
+                val dbStatus = if (executionStatusMsg.contains("✗")) "FAILURE" else "SUCCESS"
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    logRepo.insertLog(
+                        taskName       = title,
+                        dataType       = dbDataType,
+                        processingNode = dbNode,
+                        startTimeMs    = taskStartMs,
+                        endTimeMs      = taskEndMs,
+                        status         = dbStatus,
+                        inputSizeMB    = actualFileSizeMB
+                    )
+                }
+
+                Toast.makeText(context, executionStatusMsg, Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    // --- HELPER EXTRACTORS ---
-    
+    /** Returns human-readable processing mode for the selected file type. */
+    private fun resolveFileProcessingMode(mimeType: String): String = when {
+        mimeType.contains("image") -> selectedImageMode
+        mimeType.contains("video") -> selectedVideoMode
+        mimeType.contains("pdf")   -> selectedPdfMode
+        mimeType.contains("text") || mimeType.contains("json") ||
+        mimeType.contains("csv")  || mimeType.contains("xml")  -> selectedTextMode
+        else                       -> "DEFAULT"
+    }
+
+    // ─── Local CPU benchmark simulation ──────────────────────────────────────
+
+    private fun runLocalBenchmarkCompute() {
+        val size = 400
+        val matrix = Array(size) { row -> IntArray(size) { col -> row * size + col } }
+        val temp   = Array(size) { IntArray(size) }
+        repeat(20) {
+            for (r in 0 until size) for (c in 0 until size) temp[c][r] = matrix[r][c]
+            for (r in 0 until size) for (c in 0 until size) matrix[r][c] = temp[r][c]
+        }
+    }
+
+    // ─── File analysis ────────────────────────────────────────────────────────
+
     private fun analyzeFile(uri: Uri) {
-        // 1. Basic checks
         val mimeType = requireContext().contentResolver.getType(uri) ?: ""
 
-        // 2. Safely extract file size
         requireContext().contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (sizeIndex != -1 && cursor.moveToFirst()) {
                 val sizeBytes = cursor.getLong(sizeIndex)
                 actualFileSizeMB = sizeBytes / (1024.0 * 1024.0)
-                
                 val fileName = cursor.getString(nameIndex) ?: "Unknown"
-                
-                // Prevent OOM by blocking extreme files purely loading into Local Queue
+
                 if (actualFileSizeMB > 200.0) {
-                     Toast.makeText(context, "File massive (>$200MB): $fileName. Stream Processing needed.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context,
+                        "File massive (>200MB): $fileName. Stream Processing needed.",
+                        Toast.LENGTH_LONG).show()
                 }
-                
-                binding.tvFileStatus.text = "File: $fileName\nSize: ${"%.2f".format(actualFileSizeMB)} MB"
+
+                val typHint = when {
+                    mimeType.contains("image") -> "🖼 Image"
+                    mimeType.contains("video") -> "🎬 Video"
+                    mimeType.contains("pdf")   -> "📑 PDF"
+                    mimeType.contains("text") || mimeType.contains("csv") ||
+                    mimeType.contains("json")  -> "📝 Text"
+                    else                       -> "📁 Document"
+                }
+
+                binding.tvFileStatus.text =
+                    "$typHint: $fileName\nSize: ${"%.2f".format(actualFileSizeMB)} MB"
             }
         }
     }
+
+    // ─── System helpers ───────────────────────────────────────────────────────
 
     private fun getBatteryPercentage(): Int {
         val bm = requireContext().getSystemService(Context.BATTERY_SERVICE) as BatteryManager
@@ -280,9 +549,9 @@ class UploadFragment : Fragment() {
         val activeNetwork = cm.activeNetwork ?: return NetworkType.OFFLINE
         val caps = cm.getNetworkCapabilities(activeNetwork) ?: return NetworkType.OFFLINE
         return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkType.WIFI
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)     -> NetworkType.WIFI
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.MOBILE
-            else -> NetworkType.OFFLINE
+            else                                                       -> NetworkType.OFFLINE
         }
     }
 

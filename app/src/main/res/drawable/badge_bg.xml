@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Semi-transparent pill background for the execution node badge.
+     Color / tint is set in code (FileAdapter) per execution tier. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <!-- Base fill — overridden at runtime via backgroundTintList -->
+    <solid android:color="#1A2BC0A6" />
+</shape>

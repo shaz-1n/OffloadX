@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .models import ComputeTask, ComputeLog
 from .serializers import ComputeTaskSerializer, ComputeRequestSerializer, FileComputeRequestSerializer
 from .utils import process_compute_task, push_result_to_firebase
+from .cloud_simulator import simulate_cloud_composite, simulate_cloud_complex, simulate_cloud_image
 
 
 class ComputeView(APIView):
@@ -88,6 +89,201 @@ class ComputeView(APIView):
 
 
 
+# =============================================================================
+# Cloud Execution Endpoints  (Apr 10 milestone)
+# =============================================================================
+
+class CloudComputeView(APIView):
+    """
+    POST /api/cloud/compute/
+
+    Simulates cloud-tier processing for JSON payloads (COMPOSITE / COMPLEX).
+    Identical computation to /api/compute/ but includes realistic cloud
+    latency overhead (network round-trip + cold-start jitter).
+
+    The Android app calls this when ExecutionRoute == CLOUD and the user
+    has no local Hub available, or when they explicitly request cloud backup.
+    """
+    def post(self, request, format=None):
+        serializer = ComputeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        device_id  = serializer.validated_data['device_id']
+        task_type  = serializer.validated_data['task_type']
+        data       = serializer.validated_data['data']
+
+        task = ComputeTask.objects.create(
+            device_id=device_id,
+            task_type=task_type,
+            status='PROCESSING',
+            processing_started_at=timezone.now(),
+        )
+        ComputeLog.objects.create(
+            task=task, level='INFO',
+            message=f"[CLOUD] Received {task_type} task from {device_id}"
+        )
+
+        try:
+            import time
+            t0 = time.perf_counter()
+
+            if task_type == 'COMPOSITE':
+                result = simulate_cloud_composite(data)
+            else:
+                result = simulate_cloud_complex(data)
+
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+
+            task.status = 'COMPLETED'
+            task.completed_at = timezone.now()
+            task.processing_time_ms = elapsed_ms
+            task.save()
+
+            ComputeLog.objects.create(
+                task=task, level='INFO',
+                message=f"[CLOUD] Completed in {elapsed_ms}ms (includes simulated network overhead)"
+            )
+
+            return Response({
+                'task_id': str(task.id),
+                'status': 'COMPLETED',
+                'processing_time_ms': elapsed_ms,
+                'result': result,
+                'execution_tier': 'CLOUD',
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            task.status = 'FAILED'
+            task.completed_at = timezone.now()
+            task.error_message = str(e)
+            task.save()
+            ComputeLog.objects.create(task=task, level='ERROR', message=str(e))
+            return Response({
+                'task_id': str(task.id),
+                'status': 'FAILED',
+                'error': str(e),
+                'execution_tier': 'CLOUD',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CloudFileComputeView(APIView):
+    """
+    POST /api/cloud/upload/
+
+    Simulates cloud file processing (image / video) with extra latency.
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, format=None):
+        serializer = FileComputeRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        device_id  = serializer.validated_data['device_id']
+        task_type  = serializer.validated_data['task_type']
+        file_obj   = serializer.validated_data['file']
+        image_mode = serializer.validated_data.get('image_mode', 'GRAYSCALE')
+        pdf_mode   = serializer.validated_data.get('pdf_mode',   'ANALYZE')
+        text_mode  = serializer.validated_data.get('text_mode',  'WORD_COUNT')
+        video_mode = serializer.validated_data.get('video_mode', 'FACE_DETECTION')
+
+        print(f"[CLOUD]  [CLOUD TIER] Incoming file offload from {device_id} | {round(file_obj.size / 1048576, 2)} MB")
+
+        task = ComputeTask.objects.create(
+            device_id=device_id,
+            task_type=task_type,
+            status='PROCESSING',
+            processing_started_at=timezone.now(),
+        )
+
+        try:
+            import time
+            t0 = time.perf_counter()
+            result = simulate_cloud_image(
+                file_obj, image_mode=image_mode,
+                pdf_mode=pdf_mode, text_mode=text_mode, video_mode=video_mode
+            )
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+
+            task.status = 'COMPLETED'
+            task.completed_at = timezone.now()
+            task.processing_time_ms = elapsed_ms
+            task.save()
+
+            print(f"[CLOUD]  [CLOUD TIER] Done in {elapsed_ms}ms")
+
+            return Response({
+                'task_id': str(task.id),
+                'status': 'COMPLETED',
+                'processing_time_ms': elapsed_ms,
+                'result': result,
+                'execution_tier': 'CLOUD',
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            task.status = 'FAILED'
+            task.error_message = str(e)
+            task.save()
+            return Response({'error': str(e), 'execution_tier': 'CLOUD'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PerformanceReportView(APIView):
+    """
+    GET /api/report/
+
+    Returns aggregated performance statistics across all execution tiers
+    (LOCAL implied by device, HUB and CLOUD tracked server-side).
+    Used by the Android Stats screen to populate the comparison chart.
+    """
+    def get(self, request, format=None):
+        from django.db.models import Avg, Min, Max, Count
+
+        hub_stats = (
+            ComputeTask.objects
+            .filter(status='COMPLETED')
+            .exclude(processing_time_ms__isnull=True)
+        )
+
+        # Separate cloud vs hub by checking task source path (cloud tasks have cloud flag)
+        # We tag cloud tasks by checking if they were handled by CloudComputeView
+        # For now we distinguish by a naming convention: task records with >= 80ms overhead
+        # have cloud overhead baked in. Instead, report both pools:
+        hub_qs  = hub_stats.filter(task_type__in=['COMPOSITE', 'COMPLEX'])
+        # Cloud tasks are those processed through the /cloud/ endpoints — same DB table
+        # We can differentiate via ComputeLog messages containing '[CLOUD]'
+        cloud_task_ids = (
+            ComputeLog.objects
+            .filter(message__startswith='[CLOUD]')
+            .values_list('task_id', flat=True)
+            .distinct()
+        )
+
+        cloud_qs = hub_stats.filter(id__in=cloud_task_ids)
+        pure_hub_qs = hub_stats.exclude(id__in=cloud_task_ids)
+
+        def _agg(qs):
+            r = qs.aggregate(
+                avg=Avg('processing_time_ms'),
+                mn=Min('processing_time_ms'),
+                mx=Max('processing_time_ms'),
+                cnt=Count('id'),
+            )
+            return {
+                'avg_ms': round(r['avg'] or 0, 2),
+                'min_ms': round(r['mn'] or 0, 2),
+                'max_ms': round(r['mx'] or 0, 2),
+                'task_count': r['cnt'],
+            }
+
+        return Response({
+            'hub': _agg(pure_hub_qs),
+            'cloud': _agg(cloud_qs),
+            'note': 'LOCAL times are measured on-device and stored in the Android SQLite DB.',
+        })
+
+
 class FileComputeView(APIView):
     """
     POST /api/upload/
@@ -101,17 +297,22 @@ class FileComputeView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        device_id = serializer.validated_data['device_id']
-        task_type = serializer.validated_data['task_type'] # Should be IMAGE_GRAYSCALE
-        file_obj = serializer.validated_data['file']
+        device_id  = serializer.validated_data['device_id']
+        task_type  = serializer.validated_data['task_type']
+        file_obj   = serializer.validated_data['file']
+        image_mode = serializer.validated_data.get('image_mode', 'GRAYSCALE')
+        pdf_mode   = serializer.validated_data.get('pdf_mode',   'ANALYZE')
+        text_mode  = serializer.validated_data.get('text_mode',  'WORD_COUNT')
+        video_mode = serializer.validated_data.get('video_mode', 'FACE_DETECTION')
 
         print("\n" + "="*70)
-        print(f"🚀 [OFFLOAD-X EDGE NODE] INCOMING OFFLOAD OVER WIFI DETECTED!")
+        print(f"[HUB] [OFFLOAD-X EDGE NODE] INCOMING OFFLOAD OVER WIFI DETECTED!")
         print("="*70)
-        print(f"📱 Source Device : {device_id}")
-        print(f"📦 Payload Size  : {round(file_obj.size / 1048576, 2)} MB")
-        print(f"📄 File Name     : {file_obj.name}")
-        print(f"⚙️ Task Type     : {task_type} (Dynamic Heavy Compute)")
+        print(f" Source Device : {device_id}")
+        print(f"[PKG] Payload Size  : {round(file_obj.size / 1048576, 2)} MB")
+        print(f"[FILE] File Name     : {file_obj.name}")
+        print(f"[TASK] Task Type     : {task_type} (Dynamic Heavy Compute)")
+        print(f"[MODE] img={image_mode} | pdf={pdf_mode} | txt={text_mode} | vid={video_mode}")
         print("-" * 70)
 
         # Create Task Record
@@ -126,23 +327,29 @@ class FileComputeView(APIView):
         try:
             # CALL THE LOGIC (Ported from yours)
             # We pass the file_obj directly as 'data'
-            # Note: process_compute_task returns a wrapper with timing, but 
-            # for images, _process_image_grayscale returns specific keys.
-            # Let's adjust slightly:
-            compute_result = process_compute_task(file_obj, task_type)
+            # Note: process_compute_task returns a wrapper with timing; for files
+            # the result dict is nested inside 'result'. Unwrap it:
+            compute_result = process_compute_task(
+                file_obj, task_type,
+                image_mode=image_mode,
+                pdf_mode=pdf_mode,
+                text_mode=text_mode,
+                video_mode=video_mode,
+            )
 
             task.status = 'COMPLETED'
             task.completed_at = timezone.now()
             task.processing_time_ms = compute_result.get('processing_time_ms', 0)
             task.save()
             
-            print(f"✅ [SUCCESS] Edge Node Computation finished in {task.processing_time_ms} ms")
-            print(f"📤 Transmitting Computed Result back to Android Device...")
+            print(f"[OK] [SUCCESS] Edge Node Computation finished in {task.processing_time_ms} ms")
+            print(f" Transmitting Computed Result back to Android Device...")
             print("="*70 + "\n")
 
             return Response({
                 'task_id': str(task.id),
                 'status': 'COMPLETED',
+                'processing_time_ms': task.processing_time_ms,
                 'result': compute_result.get('result', compute_result), # Clean up hierarchy
             }, status=status.HTTP_200_OK)
 
@@ -151,7 +358,7 @@ class FileComputeView(APIView):
             task.error_message = str(e)
             task.save()
             
-            print(f"❌ [FAILED] Computation Error: {str(e)}")
+            print(f"[ERR] [FAILED] Computation Error: {str(e)}")
             print("="*70 + "\n")
             
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

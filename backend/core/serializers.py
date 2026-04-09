@@ -38,8 +38,59 @@ class ComputeRequestSerializer(serializers.Serializer):
 
 class FileComputeRequestSerializer(serializers.Serializer):
     """
-    Validates incoming file upload requests.
+    Validates incoming file upload requests from the mobile app.
+
+    - image_mode  : controls image processing pipeline
+    - pdf_mode    : controls PDF processing pipeline
+    - text_mode   : controls text/CSV/JSON analysis pipeline
+    - video_mode  : controls video analytics pipeline
     """
-    device_id = serializers.CharField(max_length=255)
-    file = serializers.FileField()
-    task_type = serializers.ChoiceField(choices=['IMAGE_GRAYSCALE'])
+    device_id  = serializers.CharField(max_length=255)
+    file       = serializers.FileField()
+    task_type  = serializers.ChoiceField(choices=['IMAGE_GRAYSCALE'])
+
+    image_mode = serializers.ChoiceField(
+        choices=[
+            'GRAYSCALE',        # Convert to greyscale
+            'OBJECT_DETECTION', # Haar Cascade face/object detection
+            'EDGE_DETECT',      # Canny edge detection
+            'BLUR',             # Gaussian blur
+            'SHARPEN',          # Unsharp mask sharpening
+            'SEPIA',            # Warm sepia tone
+            'INVERT',           # Colour inversion (negative)
+        ],
+        default='GRAYSCALE',
+        required=False,
+    )
+
+    pdf_mode = serializers.ChoiceField(
+        choices=[
+            'ANALYZE',       # Word / page count + metadata
+            'TEXT_EXTRACT',  # Pull all readable text
+            'STORE',         # Save original, return download URL
+        ],
+        default='ANALYZE',
+        required=False,
+    )
+
+    text_mode = serializers.ChoiceField(
+        choices=[
+            'WORD_COUNT',    # Words, lines, character count
+            'KEYWORD_FREQ',  # Top-20 keyword frequency
+            'SENTIMENT',     # Positive / negative sentiment ratio
+            'STORE',         # Save original, return download URL
+        ],
+        default='WORD_COUNT',
+        required=False,
+    )
+
+    video_mode = serializers.ChoiceField(
+        choices=[
+            'FACE_DETECTION',  # Haar Cascade ML face tracking analytics
+            'FRAME_ANALYTICS', # Edge density / complexity per frame
+            'THUMBNAIL',       # Extract first clear frame as thumbnail
+            'PASSTHROUGH',     # Store video, return download URL
+        ],
+        default='FACE_DETECTION',
+        required=False,
+    )

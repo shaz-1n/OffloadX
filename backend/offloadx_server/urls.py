@@ -8,5 +8,6 @@ urlpatterns = [
     path('api/', include('core.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Always serve media files — this is a local LAN computational node, not a public server.
+# Files uploaded/processed must be downloadable by the Android client at all times.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

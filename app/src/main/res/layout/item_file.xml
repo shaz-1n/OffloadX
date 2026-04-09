@@ -94,14 +94,29 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Download/View Button -->
-            <ImageButton
-                android:id="@+id/btnDownload"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/stat_sys_download"
-                app:tint="@color/primary_color" />
+            <!-- Action buttons row -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageButton
+                    android:id="@+id/btnView"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_view"
+                    app:tint="@color/text_secondary" />
+
+                <ImageButton
+                    android:id="@+id/btnDownload"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/stat_sys_download"
+                    app:tint="@color/primary_color" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Expandable Detail Panel (hidden by default) -->
@@ -199,6 +214,23 @@
                         android:textColor="@color/primary_color"/>
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Execution Node Badge -->
+            <TextView
+                android:id="@+id/tvExecutionNode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"
+                android:background="@drawable/badge_bg"
+                android:visibility="gone"
+                android:text="Processed on Device" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

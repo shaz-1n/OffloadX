@@ -30,6 +30,7 @@ class StatsFragment : Fragment() {
     private var _binding: FragmentStatsBinding? = null
     private val binding get() = _binding!!
     private val viewModel: SharedViewModel by activityViewModels()
+    private lateinit var logRepo: OffloadLogRepository
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -42,6 +43,8 @@ class StatsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        logRepo = OffloadLogRepository(requireContext())
 
         // Observe files for real statistics
         viewModel.downloadableFiles.observe(viewLifecycleOwner) { files ->
@@ -57,6 +60,26 @@ class StatsFragment : Fragment() {
         // Benchmark button
         binding.btnRunBenchmark.setOnClickListener {
             runLocalVsHubBenchmark()
+        }
+
+        // Report refresh button
+        binding.btnRefreshReport.setOnClickListener {
+            loadReportFromDb()
+        }
+
+        // Load report on first view
+        loadReportFromDb()
+
+        // Auto-ping edge node so connection status is always fresh
+        // when user navigates to this tab from elsewhere in the app.
+        pingEdgeNode()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-ping whenever the fragment becomes visible (e.g. after switching tabs)
+        if (_binding != null) {
+            pingEdgeNode()
         }
     }
 
@@ -158,10 +181,9 @@ class StatsFragment : Fragment() {
     // -------------------------------------------------------------------------
 
     /**
-     * Runs a 400×400 matrix-transpose computation 20× on-device (same workload
-     * as UploadFragment's local path), then sends an equivalent JSON payload to
-     * the hub's /api/compute/ endpoint and shows a grouped bar chart comparing
-     * both timings with a winner annotation.
+     * Runs a 400x400 matrix-transpose computation 20x on-device (LOCAL),
+     * then sends the same COMPOSITE workload to /api/compute/ (HUB)
+     * and /api/cloud/compute/ (CLOUD) for a 3-way comparison chart.
      */
     private fun runLocalVsHubBenchmark() {
         val prefs = requireActivity().getSharedPreferences("OffloadXPrefs", android.content.Context.MODE_PRIVATE)
@@ -170,7 +192,7 @@ class StatsFragment : Fragment() {
 
         binding.btnRunBenchmark.isEnabled = false
         binding.btnRunBenchmark.text = "Running…"
-        binding.tvBenchmarkStatus.text = "⏳ Step 1/2 — Measuring on-device compute…"
+        binding.tvBenchmarkStatus.text = "⏳ Step 1/3 — Measuring on-device compute…"
         binding.layoutBenchmarkResults.visibility = View.GONE
         binding.benchmarkChart.visibility = View.GONE
         binding.tvBenchmarkWinner.visibility = View.GONE
@@ -182,14 +204,13 @@ class StatsFragment : Fragment() {
             val localMs = System.currentTimeMillis() - localStart
 
             withContext(Dispatchers.Main) {
-                binding.tvBenchmarkStatus.text = "✅ Local: ${localMs}ms  |  ⏳ Step 2/2 — Sending to Hub…"
+                binding.tvBenchmarkStatus.text = "✅ Local: ${localMs}ms  |  ⏳ Step 2/3 — Sending to Hub…"
             }
 
             // --- PHASE 2: Hub benchmark ---
             var hubMs: Long = -1
             var hubError: String? = null
             try {
-                // Build a numbers payload that exercises the hub's COMPOSITE path
                 val numbersArray = JSONArray()
                 repeat(50_000) { i -> numbersArray.put(i.toDouble()) }
                 val body = JSONObject().apply {
@@ -197,38 +218,84 @@ class StatsFragment : Fragment() {
                     put("task_type", "COMPOSITE")
                     put("data", JSONObject().put("numbers", numbersArray))
                 }
-
                 val url = URL("$baseUrl/api/compute/")
-                val conn = url.openConnection() as HttpURLConnection
+                val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json")
                 conn.doOutput = true
                 conn.connectTimeout = 15_000
                 conn.readTimeout = 30_000
-
-                val hubStart = System.currentTimeMillis()
                 conn.outputStream.bufferedWriter().use { it.write(body.toString()) }
                 val responseCode = conn.responseCode
                 val rawBody = if (responseCode in 200..299) {
                     conn.inputStream.bufferedReader().use { it.readText() }
                 } else {
-                    conn.errorStream.bufferedReader().use { it.readText() }
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                 }
-                val roundTrip = System.currentTimeMillis() - hubStart
-
                 if (responseCode in 200..299) {
                     val json = JSONObject(rawBody)
-                    // Prefer the server's reported compute time; fall back to round-trip
-                    val serverMs = json.optDouble("processing_time_ms", roundTrip.toDouble()).toLong()
-                    hubMs = serverMs
-                    hubError = null
+                    hubMs = json.optDouble("processing_time_ms", (System.currentTimeMillis() - localStart).toDouble()).toLong()
                 } else {
-                    hubMs = -1
-                    hubError = "HTTP $responseCode"
+                    hubMs = -1; hubError = "HTTP $responseCode"
                 }
             } catch (e: Exception) {
-                hubMs = -1
-                hubError = e.message ?: "Connection failed"
+                hubMs = -1; hubError = e.message ?: "Connection failed"
+            }
+
+            withContext(Dispatchers.Main) {
+                binding.tvBenchmarkStatus.text = "✅ Local: ${localMs}ms  |  ✅ Hub: ${if (hubMs > 0) "${hubMs}ms" else "Error"}  |  ⏳ Step 3/3 — Sending to Cloud…"
+            }
+
+            // --- PHASE 3: Cloud benchmark ---
+            var cloudMs: Long = -1
+            var cloudError: String? = null
+            try {
+                val numbersArray = JSONArray()
+                repeat(50_000) { i -> numbersArray.put(i.toDouble()) }
+                val body = JSONObject().apply {
+                    put("device_id", "benchmark_android")
+                    put("task_type", "COMPOSITE")
+                    put("data", JSONObject().put("numbers", numbersArray))
+                }
+                val url = URL("$baseUrl/api/cloud/compute/")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                conn.connectTimeout = 20_000
+                conn.readTimeout = 45_000
+                conn.outputStream.bufferedWriter().use { it.write(body.toString()) }
+                val responseCode = conn.responseCode
+                val rawBody = if (responseCode in 200..299) {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+                if (responseCode in 200..299) {
+                    val json = JSONObject(rawBody)
+                    cloudMs = json.optDouble("processing_time_ms", 200.0).toLong()
+                } else {
+                    cloudMs = -1; cloudError = "HTTP $responseCode"
+                }
+            } catch (e: Exception) {
+                cloudMs = -1; cloudError = e.message ?: "Connection failed"
+            }
+
+            // Log all results to SQLite
+            val benchEndMs = System.currentTimeMillis()
+            val benchStartMs = benchEndMs - localMs - (if (hubMs > 0) hubMs else 0L) - (if (cloudMs > 0) cloudMs else 0L)
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                logRepo.insertLog("Benchmark (Local)", "COMPOSITE", "LOCAL",
+                    benchStartMs, benchStartMs + localMs, "SUCCESS", 0.0)
+                if (hubMs > 0 && hubError == null) {
+                    logRepo.insertLog("Benchmark (Hub)", "COMPOSITE", "HUB",
+                        benchStartMs + localMs, benchStartMs + localMs + hubMs, "SUCCESS", 0.0)
+                }
+                if (cloudMs > 0 && cloudError == null) {
+                    logRepo.insertLog("Benchmark (Cloud)", "COMPOSITE", "CLOUD",
+                        benchStartMs + localMs + (if (hubMs > 0) hubMs else 0L),
+                        benchStartMs + localMs + (if (hubMs > 0) hubMs else 0L) + cloudMs, "SUCCESS", 0.0)
+                }
             }
 
             // --- Update UI ---
@@ -236,36 +303,34 @@ class StatsFragment : Fragment() {
                 binding.btnRunBenchmark.isEnabled = true
                 binding.btnRunBenchmark.text = "Run Test"
 
-                if (hubError != null) {
-                    binding.tvBenchmarkStatus.text = "Local: ${localMs}ms  |  Hub error: $hubError"
-                    Toast.makeText(requireContext(), "Hub unreachable: $hubError", Toast.LENGTH_LONG).show()
-                    return@withContext
-                }
+                val hubLabel   = if (hubError != null)   "Error" else "${hubMs}ms"
+                val cloudLabel = if (cloudError != null) "Error" else "${cloudMs}ms"
+                binding.tvBenchmarkStatus.text = "Local: ${localMs}ms  |  Hub: $hubLabel  |  Cloud: $cloudLabel"
 
-                // Numeric results
-                binding.tvBenchmarkStatus.text = "Benchmark complete ✓"
                 binding.tvBenchLocalMs.text = "${localMs}ms"
-                binding.tvBenchHubMs.text = "${hubMs}ms"
+                binding.tvBenchHubMs.text   = if (hubError != null) "Err" else "${hubMs}ms"
                 binding.layoutBenchmarkResults.visibility = View.VISIBLE
 
-                // Grouped bar chart
-                showBenchmarkChart(localMs, hubMs)
+                showBenchmarkChart(localMs, if (hubMs > 0) hubMs else 0L, if (cloudMs > 0) cloudMs else 0L)
 
-                // Winner annotation
-                val diff = localMs - hubMs
-                val pct = if (localMs > 0) (diff.toDouble() / localMs * 100).toInt() else 0
-                val winnerText = when {
-                    hubMs < localMs -> "🏆 Hub is ${pct}% faster than local execution"
-                    hubMs > localMs -> "📱 Local is faster by ${kotlin.math.abs(pct)}% (hub overhead too high)"
-                    else            -> "⚖️ Both paths took the same time"
+                val validTimes = mutableMapOf("Local" to localMs)
+                if (hubMs > 0)   validTimes["Hub"]   = hubMs
+                if (cloudMs > 0) validTimes["Cloud"] = cloudMs
+                val winner = validTimes.minByOrNull { it.value }
+                binding.tvBenchmarkWinner.text = when (winner?.key) {
+                    "Local" -> "📱 Local is fastest for this workload size"
+                    "Hub"   -> "🖥️ Hub is fastest — offloading pays off!"
+                    "Cloud" -> "☁️ Cloud is fastest in this run"
+                    else    -> "⚖️ Could not determine winner"
                 }
-                binding.tvBenchmarkWinner.text = winnerText
                 binding.tvBenchmarkWinner.visibility = View.VISIBLE
+
+                loadReportFromDb()
             }
         }
     }
 
-    private fun showBenchmarkChart(localMs: Long, hubMs: Long) {
+    private fun showBenchmarkChart(localMs: Long, hubMs: Long, cloudMs: Long = 0L) {
         val chart = binding.benchmarkChart
         chart.description.isEnabled = false
         chart.legend.isEnabled = true
@@ -273,6 +338,7 @@ class StatsFragment : Fragment() {
 
         val localEntries = arrayListOf(BarEntry(0f, localMs.toFloat()))
         val hubEntries   = arrayListOf(BarEntry(0f, hubMs.toFloat()))
+        val cloudEntries = arrayListOf(BarEntry(0f, cloudMs.toFloat()))
 
         val localSet = BarDataSet(localEntries, "Local (on-device)").apply {
             color = Color.parseColor("#FF7043")
@@ -284,12 +350,18 @@ class StatsFragment : Fragment() {
             valueTextColor = ContextCompat.getColor(requireContext(), R.color.text_primary)
             valueTextSize = 11f
         }
+        val cloudSet = BarDataSet(cloudEntries, "Cloud (simulated)").apply {
+            color = Color.parseColor("#66BB6A")
+            valueTextColor = ContextCompat.getColor(requireContext(), R.color.text_primary)
+            valueTextSize = 11f
+        }
 
-        val groupSpace = 0.2f
-        val barSpace   = 0.05f
-        val barWidth   = 0.35f
+        val groupSpace = 0.16f
+        val barSpace   = 0.04f
+        val barWidth   = 0.25f
 
-        val data = BarData(localSet, hubSet)
+        val dataSets = if (cloudMs > 0L) listOf(localSet, hubSet, cloudSet) else listOf(localSet, hubSet)
+        val data = BarData(dataSets)
         data.barWidth = barWidth
 
         chart.data = data
@@ -425,6 +497,153 @@ class StatsFragment : Fragment() {
                 }
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Report Section — grouped bar chart from SQLite
+    // -------------------------------------------------------------------------
+
+    /**
+     * Queries the SQLite execution log on a background thread, then renders
+     * a grouped bar chart comparing average elapsed time for each processing
+     * node (LOCAL / HUB / CLOUD) grouped by data type.
+     */
+    private fun loadReportFromDb() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val report = logRepo.getPerformanceReport()
+            val stats  = logRepo.getOverallStats()
+
+            // Determine fastest method for each data type
+            val dataTypes = listOf("SIMPLE", "COMPOSITE", "COMPLEX")
+            val fastestMap = mutableMapOf<String, OffloadLogRepository.FastestResult?>()
+            for (dt in dataTypes) {
+                fastestMap[dt] = logRepo.getFastestMethodForDataType(dt)
+            }
+
+            withContext(Dispatchers.Main) {
+                if (report.isEmpty()) {
+                    binding.tvReportSummary.text = "No execution logs yet. Run an upload or benchmark to populate."
+                    binding.reportChart.visibility = View.GONE
+                    binding.tvFastestMethod.visibility = View.GONE
+                    return@withContext
+                }
+
+                // Summary text
+                val summaryParts = mutableListOf<String>()
+                summaryParts.add("${stats.totalTasks} total runs")
+                summaryParts.add("${stats.successCount} succeeded")
+                if (stats.failureCount > 0) summaryParts.add("${stats.failureCount} failed")
+                summaryParts.add("avg ${"%.0f".format(stats.avgElapsedMs)}ms")
+                binding.tvReportSummary.text = summaryParts.joinToString(" • ")
+
+                // Fastest method annotation
+                val fastestLines = mutableListOf<String>()
+                for ((dt, result) in fastestMap) {
+                    if (result != null) {
+                        val icon = when (result.processingNode) {
+                            "LOCAL" -> "\uD83D\uDCF1"
+                            "HUB"   -> "\uD83D\uDDA5\uFE0F"
+                            "CLOUD" -> "\u2601\uFE0F"
+                            else    -> "\u2022"
+                        }
+                        fastestLines.add("$icon $dt → ${result.processingNode} (${"%.0f".format(result.averageMs)}ms avg, ${result.runCount} runs)")
+                    }
+                }
+                if (fastestLines.isNotEmpty()) {
+                    binding.tvFastestMethod.text = "Fastest Method:\n" + fastestLines.joinToString("\n")
+                    binding.tvFastestMethod.visibility = View.VISIBLE
+                } else {
+                    binding.tvFastestMethod.visibility = View.GONE
+                }
+
+                // Build grouped bar chart
+                setupReportChart(report)
+            }
+        }
+    }
+
+    /**
+     * Renders a grouped bar chart: X‑axis = data types, bars = processing nodes.
+     * Up to 3 bars (LOCAL, HUB, CLOUD) per data type.
+     */
+    private fun setupReportChart(report: List<OffloadLogRepository.ReportRow>) {
+        val chart = binding.reportChart
+        chart.description.isEnabled = false
+        chart.legend.isEnabled = true
+        chart.setTouchEnabled(true)
+        chart.visibility = View.VISIBLE
+
+        // Distinct data types present in the report
+        val dataTypes = report.map { it.dataType }.distinct().sorted()
+        val nodeOrder = listOf("LOCAL", "HUB", "CLOUD")
+        val nodeColors = mapOf(
+            "LOCAL" to Color.parseColor("#FF7043"),
+            "HUB"   to ContextCompat.getColor(requireContext(), R.color.primary_color),
+            "CLOUD" to Color.parseColor("#66BB6A")
+        )
+
+        // Build lookup: (dataType, node) → avgMs
+        val lookup = report.associate { (it.dataType to it.processingNode) to it.avgMs }
+
+        val dataSets = mutableListOf<BarDataSet>()
+        for (node in nodeOrder) {
+            val entries = ArrayList<BarEntry>()
+            dataTypes.forEachIndexed { idx, dt ->
+                val avgMs = lookup[dt to node] ?: 0.0
+                entries.add(BarEntry(idx.toFloat(), avgMs.toFloat()))
+            }
+            // Only add dataset if it has at least one non‑zero value
+            if (entries.any { it.y > 0f }) {
+                val set = BarDataSet(entries, node).apply {
+                    color = nodeColors[node] ?: Color.GRAY
+                    valueTextColor = ContextCompat.getColor(requireContext(), R.color.text_primary)
+                    valueTextSize = 9f
+                }
+                dataSets.add(set)
+            }
+        }
+
+        if (dataSets.isEmpty()) {
+            chart.visibility = View.GONE
+            return
+        }
+
+        val groupSpace = 0.24f
+        val barSpace   = 0.04f
+        val barWidth   = (1f - groupSpace) / dataSets.size - barSpace
+
+        val data = BarData(dataSets.toList())
+        data.barWidth = barWidth
+        chart.data = data
+
+        if (dataSets.size > 1) {
+            chart.groupBars(0f, groupSpace, barSpace)
+        }
+
+        val xAxis = chart.xAxis
+        xAxis.position = XAxis.XAxisPosition.BOTTOM
+        xAxis.setDrawGridLines(false)
+        xAxis.granularity = 1f
+        xAxis.setCenterAxisLabels(dataSets.size > 1)
+        xAxis.valueFormatter = IndexAxisValueFormatter(dataTypes)
+        xAxis.textColor = ContextCompat.getColor(requireContext(), R.color.text_secondary)
+        xAxis.textSize = 11f
+        xAxis.axisMinimum = 0f
+        xAxis.axisMaximum = if (dataSets.size > 1) {
+            chart.barData.getGroupWidth(groupSpace, barSpace) * dataTypes.size
+        } else {
+            dataTypes.size.toFloat()
+        }
+
+        chart.axisLeft.apply {
+            axisMinimum = 0f
+            textColor = ContextCompat.getColor(requireContext(), R.color.text_secondary)
+            gridColor = ContextCompat.getColor(requireContext(), R.color.input_stroke_color)
+        }
+        chart.axisRight.isEnabled = false
+        chart.setFitBars(true)
+        chart.invalidate()
+        chart.animateY(700)
     }
 
     override fun onDestroyView() {

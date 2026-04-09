@@ -40,6 +40,7 @@ class FileAdapter(
         val tvProcessingTime: TextView? = itemView.findViewById(R.id.tvProcessingTime)
         val tvTaskType: TextView? = itemView.findViewById(R.id.tvTaskType)
         val tvOriginalSize: TextView? = itemView.findViewById(R.id.tvOriginalSize)
+        val tvExecutionNode: TextView? = itemView.findViewById(R.id.tvExecutionNode)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
@@ -58,10 +59,14 @@ class FileAdapter(
         // Icon based on file type (list mode only)
         holder.ivFileIcon?.let { icon ->
             val iconRes = when (currentFile.fileType.lowercase()) {
-                "pdf" -> android.R.drawable.ic_menu_edit
-                "image", "jpg", "png" -> android.R.drawable.ic_menu_gallery
-                "video", "mp4" -> android.R.drawable.presence_video_online
-                else -> android.R.drawable.ic_menu_save
+                "pdf"               -> android.R.drawable.ic_menu_edit
+                "image", "jpg",
+                "png", "webp"       -> android.R.drawable.ic_menu_gallery
+                "video", "mp4"      -> android.R.drawable.presence_video_online
+                "text", "txt", "csv" -> android.R.drawable.ic_menu_agenda
+                "doc", "docx",
+                "xlsx"              -> android.R.drawable.ic_menu_manage
+                else                -> android.R.drawable.ic_menu_save
             }
             icon.setImageResource(iconRes)
         }
@@ -97,6 +102,21 @@ class FileAdapter(
                 holder.tvProcessingTime?.text = if (currentFile.processingTimeMs > 0) "${currentFile.processingTimeMs}ms" else "—"
                 holder.tvTaskType?.text = currentFile.taskType.ifEmpty { "—" }
                 holder.tvOriginalSize?.text = if (currentFile.dataSizeMB > 0) "${"%.2f".format(currentFile.dataSizeMB)} MB" else "—"
+
+                // Show where processing ran — pill badge tinted per tier
+                holder.tvExecutionNode?.let { tv ->
+                    val (label, tintHex) = when (currentFile.executionNode.uppercase()) {
+                        "HUB"   -> Pair("🖥  Hub (Local Edge Node)",    "#CC2BC0A6")  // teal
+                        "CLOUD" -> Pair("☁  Cloud (Simulated)",          "#CC7B52DD")  // purple
+                        else    -> Pair("📱  Device (Local)",             "#CC888888")  // grey
+                    }
+                    tv.text = label
+                    tv.setTextColor(android.graphics.Color.WHITE)
+                    tv.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                        android.graphics.Color.parseColor(tintHex)
+                    )
+                    tv.visibility = View.VISIBLE
+                }
             }
         }
 
@@ -126,34 +146,63 @@ class FileAdapter(
             true
         }
 
-        // View button (grid mode) — opens downloads folder
+        // View button — opens the file using the correct app based on MIME type
         holder.btnView?.setOnClickListener {
-            if (currentFile.isDownloaded || currentFile.processedUrl.isNotEmpty()) {
+            val url = currentFile.processedUrl
+            if (url.isNotEmpty() && url.startsWith("http")) {
+                // For images specifically, open directly in browser for maximum compatibility
+                val isImage = currentFile.fileType.lowercase() in listOf("image", "jpg", "png", "gif", "webp")
+                if (isImage) {
+                    try {
+                        val browserIntent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(url)
+                        )
+                        holder.itemView.context.startActivity(browserIntent)
+                    } catch (e: Exception) {
+                        Toast.makeText(holder.itemView.context, "No browser found to preview image.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    openFileInViewer(holder.itemView.context, url, currentFile.fileType)
+                }
+            } else if (currentFile.executionNode.uppercase() == "LOCAL") {
+                Toast.makeText(holder.itemView.context,
+                    "📱 Processed locally — results are computed on-device only. No file to preview.",
+                    Toast.LENGTH_LONG).show()
+            } else if (currentFile.isDownloaded) {
                 try {
                     val intent = android.content.Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
                     holder.itemView.context.startActivity(intent)
                 } catch (e: Exception) {
-                    Toast.makeText(holder.itemView.context, "No app found to open Downloads.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(holder.itemView.context, "Open Downloads folder to view.", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(holder.itemView.context, "File not available for viewing yet.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(holder.itemView.context,
+                    "No preview available. Tap ⬇ Download to save the file first.",
+                    Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Download button
+        // Download button — downloads the file via DownloadManager, then opens it
         holder.btnDownload.setOnClickListener {
+            // If already downloaded, open it
             if (currentFile.isDownloaded && currentFile.processedUrl.isNotEmpty()) {
                 try {
                     val intent = android.content.Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
                     holder.itemView.context.startActivity(intent)
                 } catch (e: Exception) {
-                    Toast.makeText(holder.itemView.context, "No app found to open Downloads.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(holder.itemView.context, "Open Downloads folder to view.", Toast.LENGTH_SHORT).show()
                 }
                 return@setOnClickListener
             }
 
-            if (currentFile.processedUrl.isEmpty() || !currentFile.processedUrl.startsWith("http")) {
-                Toast.makeText(holder.itemView.context, "No valid URL. Task may have failed.", Toast.LENGTH_SHORT).show()
+            val url = currentFile.processedUrl
+            if (url.isEmpty() || !url.startsWith("http")) {
+                val msg = when (currentFile.executionNode.uppercase()) {
+                    "LOCAL" -> "📱 Processed locally on device — no server file to download."
+                    else    -> "Download link unavailable. The task may have failed on the server."
+                }
+                Toast.makeText(holder.itemView.context, msg, Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
 
@@ -162,29 +211,71 @@ class FileAdapter(
             holder.btnDownload.isEnabled = false
 
             try {
-                val uri = android.net.Uri.parse(currentFile.processedUrl)
+                // Determine MIME for DownloadManager so Android knows how to open it
+                val mime = getMimeType(currentFile.fileType)
+                val uri = android.net.Uri.parse(url)
                 val request = android.app.DownloadManager.Request(uri)
                 request.setTitle(currentFile.fileName)
-                request.setDescription("Downloading Edge-Computed Result...")
+                request.setDescription("OffloadX Edge-Computed Result")
+                request.setMimeType(mime)
                 request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 request.setDestinationInExternalPublicDir(
                     android.os.Environment.DIRECTORY_DOWNLOADS,
                     "${System.currentTimeMillis()}_${currentFile.fileName}"
                 )
-                val dm = holder.itemView.context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                val dm = holder.itemView.context.getSystemService(android.content.Context.DOWNLOAD_SERVICE)
+                        as android.app.DownloadManager
                 dm.enqueue(request)
 
                 holder.itemView.postDelayed({
                     currentFile.isDownloaded = true
                     onDownloadSuccess(currentFile.processedUrl)
                     notifyItemChanged(position)
-                }, 1000)
+                }, 1500)
             } catch (e: Exception) {
                 Toast.makeText(holder.itemView.context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
                 holder.btnDownload.isEnabled = true
                 holder.btnDownload.setImageResource(R.drawable.ic_nav_download)
             }
         }
+    }
+
+    /** Opens a remote URL in the correct viewer app based on file type. */
+    private fun openFileInViewer(context: android.content.Context, url: String, fileType: String) {
+        try {
+            val mime = getMimeType(fileType)
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(android.net.Uri.parse(url), mime)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback: open in browser
+            try {
+                val browserIntent = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(url)
+                )
+                context.startActivity(browserIntent)
+            } catch (e2: Exception) {
+                Toast.makeText(context, "No app found to open this file type.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Maps our internal fileType string to a proper MIME type for intents. */
+    private fun getMimeType(fileType: String): String = when (fileType.lowercase()) {
+        "pdf"                   -> "application/pdf"
+        "image", "jpg", "png",
+        "gif", "webp", "bmp"    -> "image/*"
+        "video", "mp4"          -> "video/*"
+        "text", "txt"           -> "text/plain"
+        "csv"                   -> "text/csv"
+        "json"                  -> "application/json"
+        "xml"                   -> "text/xml"
+        "doc", "docx"           -> "application/msword"
+        "xlsx"                  -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        else                    -> "application/octet-stream"
     }
 
     override fun getItemCount(): Int = fileList.size

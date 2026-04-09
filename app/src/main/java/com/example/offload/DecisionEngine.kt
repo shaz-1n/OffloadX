@@ -43,11 +43,11 @@ class DecisionEngine {
                   return ExecutionRoute.HUB
              }
         } else if (networkType == NetworkType.MOBILE) {
-             if (dataSizeMB > 2.0) {
-                 Log.d(TAG, "Mobile Data Active. Restricting Heavy upload (>2MB). Routing to LOCAL Queue.")
+             if (dataSizeMB > 50.0) {
+                 Log.d(TAG, "Mobile Data Active. Restricting Heavy upload (>50MB). Routing to LOCAL Queue.")
                  return ExecutionRoute.LOCAL
              } else {
-                 Log.d(TAG, "Mobile Data Active but file is small. Routing to HUB.")
+                 Log.d(TAG, "Mobile Data Active but file is within limit (<50MB). Routing to HUB.")
                  return ExecutionRoute.HUB
              }
         }

@@ -97,6 +97,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             obj.put("dataSizeMB", file.dataSizeMB)
             obj.put("taskType", file.taskType)
             obj.put("timestamp", file.timestamp)
+            obj.put("executionNode", file.executionNode)
             filesArray.put(obj)
         }
 
@@ -135,7 +136,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                         processingTimeMs = obj.optLong("processingTimeMs", 0L),
                         dataSizeMB = obj.optDouble("dataSizeMB", 0.0),
                         taskType = obj.optString("taskType", "COMPOSITE"),
-                        timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                        timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
+                        executionNode = obj.optString("executionNode", "LOCAL")
                     )
                 )
             }

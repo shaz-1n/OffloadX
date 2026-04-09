@@ -22,28 +22,34 @@ from django.conf import settings
 # =============================================================================
 
 
-def process_compute_task(data: dict, task_type: str) -> dict:
+def process_compute_task(data, task_type: str, image_mode: str = 'GRAYSCALE',
+                         pdf_mode: str = 'ANALYZE', text_mode: str = 'WORD_COUNT',
+                         video_mode: str = 'FACE_DETECTION') -> dict:
     """
     The main real-time processing function.
     
     Args:
-        data: The raw payload sent from the mobile device.
-        task_type: 'COMPOSITE' or 'COMPLEX'
+        data:       The raw payload sent from the mobile device (dict OR file object).
+        task_type:  'COMPOSITE', 'COMPLEX', or 'IMAGE_GRAYSCALE'
+        image_mode: Only relevant for image files.
+        pdf_mode:   Controls PDF processing (ANALYZE / TEXT_EXTRACT / STORE).
+        text_mode:  Controls text processing (WORD_COUNT / KEYWORD_FREQ / SENTIMENT / STORE).
+        video_mode: Controls video processing (FACE_DETECTION / FRAME_ANALYTICS / THUMBNAIL / PASSTHROUGH).
     
     Returns:
         dict with 'result' (the computed output) and 'processing_time_ms'.
     """
     start_time = time.perf_counter()
     
-    print(f"⏳ [EDGE CPU] Allocating threads for {task_type} Processing...")
+    print(f"[EDGE CPU] Processing {task_type} task (image_mode={image_mode}, pdf={pdf_mode}, txt={text_mode}, vid={video_mode})...")
 
     if task_type == 'COMPOSITE':
         result = _composite_processing(data)
     elif task_type == 'COMPLEX':
         result = _complex_processing(data)
     elif task_type == 'IMAGE_GRAYSCALE':
-        # Data in this case is the file object itself
-        result = _process_image_grayscale(data)
+        result = _process_image_file(data, image_mode, pdf_mode=pdf_mode,
+                                     text_mode=text_mode, video_mode=video_mode)
     else:
         raise ValueError(f"Unknown task_type: {task_type}")
 
@@ -231,55 +237,542 @@ def _process_video_analytics(file_obj) -> dict:
         }
 
 
-def _process_image_grayscale(file_obj) -> dict:
+def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
+                        pdf_mode: str = 'ANALYZE', text_mode: str = 'WORD_COUNT',
+                        video_mode: str = 'FACE_DETECTION') -> dict:
     """
-    Handles IMAGE_GRAYSCALE tasks using Pillow.
-    Converts uploaded image to Black & White.
+    Smart file router + multi-mode processor.
+
+    Non-image types are routed to specialised handlers based on chosen mode.
+    For images, image_mode selects the processing pipeline.
     """
+    filename = getattr(file_obj, 'name', 'upload').lower()
+    timestamp = int(time.time())
+
+    # ─── Helper: save any bytes to Django media storage and return the URL ───
+    def _save_and_url(data: bytes, name: str) -> str:
+        path = default_storage.save(f"processed/{name}", ContentFile(data))
+        return settings.MEDIA_URL + path
+
+    # ─── 1. VIDEO ────────────────────────────────────────────────────────────
+    if any(filename.endswith(ext) for ext in ('.mp4', '.mkv', '.mov', '.avi')):
+        print(f"    -> [VIDEO DETECTED] Routing to video processor (mode={video_mode})...")
+        return _process_video(file_obj, video_mode, timestamp, _save_and_url)
+
+    # ─── 2. PDF ──────────────────────────────────────────────────────────────
+    if filename.endswith('.pdf'):
+        print(f"    -> [PDF DETECTED] Routing to PDF processor (mode={pdf_mode})...")
+        return _process_pdf(file_obj, pdf_mode, timestamp, _save_and_url)
+
+    # ─── 3. TEXT / CSV / LOG ─────────────────────────────────────────────────
+    if any(filename.endswith(ext) for ext in ('.txt', '.csv', '.log', '.md', '.json', '.xml')):
+        print(f"    -> [TEXT DETECTED] Routing to text processor (mode={text_mode})...")
+        return _process_text(file_obj, text_mode, timestamp, _save_and_url)
+
+    # ─── 4. IMAGE ────────────────────────────────────────────────────────────
+    if any(filename.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff')):
+        print(f"    -> [IMAGE DETECTED] Executing mode: {image_mode}...")
+        try:
+            image = Image.open(file_obj).convert('RGB')
+            mode_label = image_mode
+
+            if image_mode == 'GRAYSCALE':
+                # GRAYSCALE: convert to L then back to RGB so JPEG save is always 3-channel.
+                # Android image viewers reject single-channel (L-mode) JPEGs.
+                processed = image.convert('L').convert('RGB')
+                mode_label = 'Grayscale'
+
+            elif image_mode == 'OBJECT_DETECTION':
+                # Haar Cascade face detection — draw bounding boxes
+                import cv2
+                import numpy as np
+                import tempfile
+
+                buf = io.BytesIO()
+                image.save(buf, format='JPEG')
+                buf.seek(0)
+                np_arr = np.frombuffer(buf.read(), np.uint8)
+                cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+                gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                face_cascade = cv2.CascadeClassifier(
+                    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                )
+                faces = face_cascade.detectMultiScale(
+                    gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+                )
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(cv_img, (x, y), (x + w, y + h), (0, 255, 80), 3)
+                    cv2.putText(cv_img, "DETECTED", (x, y - 8),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 80), 2)
+
+                # Overlay stats banner
+                cv2.rectangle(cv_img, (0, 0), (cv_img.shape[1], 40), (0, 0, 0), -1)
+                cv2.putText(cv_img, f"OffloadX: {len(faces)} object(s) detected",
+                            (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 200), 2)
+
+                _, enc = cv2.imencode('.jpg', cv_img)
+                out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
+                file_url = _save_and_url(enc.tobytes(), out_name)
+                mode_label = f'Object Detection ({len(faces)} found)'
+                print(f"    -> Object Detection: {len(faces)} face(s) found.")
+                return {
+                    'status': 'success',
+                    'original_name': file_obj.name,
+                    'processed_url': file_url,
+                    'file_type': 'image',
+                    'mode': mode_label,
+                    'objects_detected': int(len(faces)),
+                    'dimensions': f"{image.width}x{image.height}",
+                }
+
+            elif image_mode == 'EDGE_DETECT':
+                try:
+                    import cv2
+                    import numpy as np
+                    buf = io.BytesIO()
+                    image.save(buf, format='JPEG')
+                    np_arr = np.frombuffer(buf.getvalue(), np.uint8)
+                    cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                    gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                    edges = cv2.Canny(gray, threshold1=80, threshold2=160)
+                    edges_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+                    _, enc = cv2.imencode('.jpg', edges_rgb)
+                    processed_bytes = enc.tobytes()
+                    print("    -> Edge Detection: OpenCV Canny applied.")
+                except ImportError:
+                    # PIL fallback: find edges
+                    from PIL import ImageFilter
+                    gray_img = image.convert('L')
+                    processed = gray_img.filter(ImageFilter.FIND_EDGES)
+                    buf2 = io.BytesIO()
+                    processed.save(buf2, format='JPEG')
+                    processed_bytes = buf2.getvalue()
+                    print("    -> Edge Detection: PIL fallback used.")
+                out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
+                file_url = _save_and_url(processed_bytes, out_name)
+                return {
+                    'status': 'success',
+                    'original_name': file_obj.name,
+                    'processed_url': file_url,
+                    'file_type': 'image',
+                    'mode': 'Edge Detection (Canny)',
+                    'dimensions': f"{image.width}x{image.height}",
+                }
+
+            elif image_mode == 'BLUR':
+                from PIL import ImageFilter
+                processed = image.filter(ImageFilter.GaussianBlur(radius=6))
+                mode_label = 'Gaussian Blur'
+
+            elif image_mode == 'SHARPEN':
+                from PIL import ImageFilter
+                processed = image.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=3))
+                mode_label = 'Sharpen (Unsharp Mask)'
+
+            elif image_mode == 'SEPIA':
+                # Try numpy fast path first; pure-PIL fallback so it always works
+                try:
+                    import numpy as np
+                    arr = np.array(image, dtype=np.float64)
+                    sepia_kernel = np.array([
+                        [0.393, 0.769, 0.189],
+                        [0.349, 0.686, 0.168],
+                        [0.272, 0.534, 0.131],
+                    ])
+                    sepia = arr @ sepia_kernel.T
+                    sepia = np.clip(sepia, 0, 255).astype(np.uint8)
+                    processed = Image.fromarray(sepia, 'RGB')
+                except ImportError:
+                    # PIL-only fallback: warm tone via channel merge
+                    r, g, b = image.split()
+                    # Simple warm-tone sepia approximation without numpy
+                    from PIL import ImageEnhance
+                    gray = image.convert('L')
+                    gray_rgb = gray.convert('RGB')
+                    r2, g2, b2 = gray_rgb.split()
+                    # Sepia tone adjustments on individual channels
+                    r2 = r2.point(lambda i: min(255, int(i * 1.1)))
+                    b2 = b2.point(lambda i: int(i * 0.85))
+                    processed = Image.merge('RGB', (r2, g2, b2))
+                mode_label = 'Sepia Tone'
+
+            elif image_mode == 'INVERT':
+                # Try numpy fast path; pure-PIL fallback
+                try:
+                    import numpy as np
+                    arr = np.array(image)
+                    processed = Image.fromarray(255 - arr, 'RGB')
+                except ImportError:
+                    from PIL import ImageChops
+                    # Create a white image and subtract original
+                    white = Image.new('RGB', image.size, (255, 255, 255))
+                    processed = ImageChops.difference(white, image)
+                mode_label = 'Colour Invert'
+
+            else:
+                # Unknown mode — fall back to grayscale
+                processed = image.convert('L')
+                mode_label = f'Grayscale (unknown mode: {image_mode})'
+
+            # Save PIL image result
+            buffer = io.BytesIO()
+            fmt = 'JPEG'
+            processed.save(buffer, format=fmt)
+            out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
+            file_url = _save_and_url(buffer.getvalue(), out_name)
+            print(f"    -> Mode '{image_mode}' applied to {image.width}x{image.height} image.")
+            return {
+                'status': 'success',
+                'original_name': file_obj.name,
+                'processed_url': file_url,
+                'file_type': 'image',
+                'mode': mode_label,
+                'dimensions': f"{image.width}x{image.height}",
+            }
+        except Exception as e:
+            print(f"    -> [WARN] Image processing failed ({image_mode}): {e}. Storing original.")
+            import traceback; traceback.print_exc()
+            # Return the original image as fallback rather than falling through to generic handler
+            try:
+                buf_orig = io.BytesIO()
+                image.convert('RGB').save(buf_orig, format='JPEG')
+                out_name = f"processed_{timestamp}_original_fallback_{file_obj.name}"
+                file_url = _save_and_url(buf_orig.getvalue(), out_name)
+                return {
+                    'status': 'partial',
+                    'original_name': file_obj.name,
+                    'processed_url': file_url,
+                    'file_type': 'image',
+                    'mode': f'{image_mode} (failed — original returned)',
+                    'error': str(e),
+                    'dimensions': f"{image.width}x{image.height}",
+                }
+            except Exception:
+                return {
+                    'status': 'error',
+                    'error_caught': str(e),
+                    'mode': f'{image_mode} Failed',
+                }
+
+    # ─── 5. GENERIC FALLBACK (docx, xlsx, zip, etc.) ────────────────────────
+    print(f"    -> [GENERIC FILE] Storing '{filename}' and serving download link...")
     try:
-        filename = getattr(file_obj, 'name', '').lower()
-        
-        if filename.endswith('.mp4') or filename.endswith('.mkv') or filename.endswith('.mov'):
-            print(f"    -> [VIDEO DETECTED] Routing to Real Heavy OpenCV Video Analytics Engine...")
-            return _process_video_analytics(file_obj)
-            
-        print(f"    -> [IMAGE DETECTED] Executing Heavy Neural Grayscale Filter Pipeline...")
-        # 1. Open image
-        image = Image.open(file_obj)
-        
-        # 2. Process (Grayscale)
-        processed_image = image.convert('L')
-        
-        # 3. Save to buffer
-        buffer = io.BytesIO()
-        processed_image.save(buffer, format=image.format or 'JPEG')
-        
-        # 4. Save to Media Storage
-        timestamp = int(time.time())
-        file_path = f"processed_{timestamp}_{file_obj.name}"
-        path = default_storage.save(f"processed/{file_path}", ContentFile(buffer.getvalue()))
-        
-        # 5. Return URL
-        # Assuming MEDIA_URL is set in settings.py
-        file_url = settings.MEDIA_URL + path
-        
-        print(f"    -> Filter applied successfully to {image.width}x{image.height} image.")
+        data = file_obj.read()
+        out_name = f"processed_{timestamp}_{file_obj.name}"
+        file_url = _save_and_url(data, out_name)
         return {
             'status': 'success',
             'original_name': file_obj.name,
             'processed_url': file_url,
-            'mode': 'Grayscale',
-            'dimensions': f"{image.width}x{image.height}"
+            'file_type': 'document',
+            'mode': 'Generic Byte Stream Analysis',
+            'size_bytes': len(data),
+            'analysis': 'File bytes indexed and stored. Ready for download.',
         }
     except Exception as e:
-        print(f"    -> [ERROR parsing file] Treating as generic binary file analytics.")
-        time.sleep(1.0)
         return {
-            'status': 'success',
+            'status': 'error',
             'error_caught': str(e),
-            'mode': 'Generic Byte Stream Analysis',
-            'analysis': 'File bytes indexed successfully for downstream ML model.'
+            'mode': 'File Store Failed',
         }
+
+
+# =============================================================================
+# Per-File-Type Processing Helpers
+# =============================================================================
+
+def _process_pdf(file_obj, pdf_mode: str, timestamp: int, save_and_url) -> dict:
+    """
+    PDF processing with selectable modes:
+      ANALYZE       – page/word estimate + metadata (default)
+      TEXT_EXTRACT  – pull all readable text via PyPDF2 / fallback raw scan
+      STORE         – store original and return download URL
+    """
+    try:
+        data = file_obj.read()
+        page_count = data.count(b'/Page')
+        out_name = f"processed_{timestamp}_{file_obj.name}"
+        file_url = save_and_url(data, out_name)
+
+        if pdf_mode == 'STORE':
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'pdf',
+                'mode': 'Stored (Original)',
+                'size_bytes': len(data),
+            }
+
+        if pdf_mode == 'TEXT_EXTRACT':
+            extracted = ''
+            try:
+                import io as _io
+                import PyPDF2
+                reader = PyPDF2.PdfReader(_io.BytesIO(data))
+                for page in reader.pages:
+                    extracted += (page.extract_text() or '') + '\n'
+            except Exception:
+                # Naive fallback: pull printable ASCII between PDF stream markers
+                extracted = data.decode('latin-1', errors='ignore')
+                # Keep only lines that look like readable text
+                lines = [l for l in extracted.splitlines() if len(l.strip()) > 5
+                         and not l.strip().startswith('%')]
+                extracted = '\n'.join(lines[:200])
+
+            word_count = len(extracted.split())
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'pdf',
+                'mode': 'Text Extraction',
+                'pages_detected': page_count,
+                'extracted_word_count': word_count,
+                'preview': extracted[:500] + ('…' if len(extracted) > 500 else ''),
+            }
+
+        # Default: ANALYZE
+        size_kb = round(len(data) / 1024, 1)
+        return {
+            'status': 'success', 'original_name': file_obj.name,
+            'processed_url': file_url, 'file_type': 'pdf',
+            'mode': 'PDF Analysis',
+            'pages_detected': page_count,
+            'size_kb': size_kb,
+            'analysis': f'{page_count} pages detected, {size_kb} KB indexed.',
+        }
+    except Exception as e:
+        return {'status': 'error', 'error_caught': str(e), 'mode': f'PDF {pdf_mode} Failed'}
+
+
+def _process_text(file_obj, text_mode: str, timestamp: int, save_and_url) -> dict:
+    """
+    Text/CSV/JSON processing with selectable modes:
+      WORD_COUNT    – words, lines, characters (default)
+      KEYWORD_FREQ  – top-20 word frequency list
+      SENTIMENT     – simple positive / negative ratio scan
+      STORE         – store original and return download URL
+    """
+    try:
+        raw = file_obj.read()
+        text = raw.decode('utf-8', errors='replace')
+        out_name = f"processed_{timestamp}_{file_obj.name}"
+        file_url = save_and_url(raw, out_name)
+
+        if text_mode == 'STORE':
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'text',
+                'mode': 'Stored (Original)', 'size_bytes': len(raw),
+            }
+
+        words_list = text.split()
+        word_count = len(words_list)
+        line_count = text.count('\n') + 1
+        char_count = len(text)
+
+        if text_mode == 'KEYWORD_FREQ':
+            import re
+            from collections import Counter
+            tokens = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+            stop = {'the','and','for','are','was','with','this','that','from',
+                    'not','but','have','been','they','will','can','all','its',
+                    'has','had','their','more','also','into','than','then'}
+            freq = Counter(t for t in tokens if t not in stop).most_common(20)
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'text',
+                'mode': 'Keyword Frequency',
+                'word_count': word_count, 'line_count': line_count,
+                'top_keywords': [{'word': w, 'count': c} for w, c in freq],
+            }
+
+        if text_mode == 'SENTIMENT':
+            pos_words = {'good','great','excellent','happy','positive','best','love',
+                         'wonderful','fantastic','amazing','success','win','gains'}
+            neg_words = {'bad','terrible','poor','sad','negative','worst','hate',
+                         'awful','failure','loss','error','fail','broken','crash'}
+            text_lower = text.lower()
+            pos = sum(text_lower.count(w) for w in pos_words)
+            neg = sum(text_lower.count(w) for w in neg_words)
+            total = pos + neg
+            sentiment = 'Neutral'
+            if total > 0:
+                sentiment = 'Positive' if pos > neg else ('Negative' if neg > pos else 'Neutral')
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'text',
+                'mode': 'Sentiment Analysis',
+                'word_count': word_count, 'line_count': line_count,
+                'sentiment': sentiment,
+                'positive_hits': pos, 'negative_hits': neg,
+            }
+
+        # Default: WORD_COUNT
+        return {
+            'status': 'success', 'original_name': file_obj.name,
+            'processed_url': file_url, 'file_type': 'text',
+            'mode': 'Word Count Analysis',
+            'word_count': word_count, 'line_count': line_count, 'char_count': char_count,
+        }
+    except Exception as e:
+        return {'status': 'error', 'error_caught': str(e), 'mode': f'Text {text_mode} Failed'}
+
+
+def _process_video(file_obj, video_mode: str, timestamp: int, save_and_url) -> dict:
+    """
+    Video processing with selectable modes:
+      FACE_DETECTION  – Haar Cascade ML face tracking (best demo)
+      FRAME_ANALYTICS – Edge density / complexity report
+      THUMBNAIL       – Extract first clear frame as JPEG
+      PASSTHROUGH     – Store original, return download URL
+    """
+    if video_mode == 'PASSTHROUGH':
+        try:
+            data = file_obj.read()
+            out_name = f"processed_{timestamp}_{file_obj.name}"
+            file_url = save_and_url(data, out_name)
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'video',
+                'mode': 'Passthrough (Stored)', 'size_bytes': len(data),
+            }
+        except Exception as e:
+            return {'status': 'error', 'error_caught': str(e), 'mode': 'Video Passthrough Failed'}
+
+    # All CV-based modes need OpenCV — wrap in one try block
+    try:
+        import cv2
+        import numpy as np
+        import tempfile, os
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
+            for chunk in file_obj.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        cap = cv2.VideoCapture(tmp_path)
+        frame_count = 0
+        best_frame = None
+
+        if video_mode == 'THUMBNAIL':
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame_count += 1
+                best_frame = frame
+                if frame_count >= 30:
+                    break
+            cap.release()
+            os.remove(tmp_path)
+
+            if best_frame is None:
+                return {'status': 'error', 'mode': 'Thumbnail – no frame read'}
+
+            _, enc = cv2.imencode('.jpg', best_frame)
+            out_name = f"thumb_{timestamp}_{file_obj.name}.jpg"
+            file_url = save_and_url(enc.tobytes(), out_name)
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': file_url, 'file_type': 'image',
+                'mode': 'Video Thumbnail',
+                'frames_scanned': frame_count,
+            }
+
+        if video_mode == 'FRAME_ANALYTICS':
+            complexity_scores = []
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame_count += 1
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                edges = cv2.Canny(gray, 100, 200)
+                complexity_scores.append(float(np.mean(edges)))
+                if frame_count >= 150:
+                    break
+            cap.release()
+            os.remove(tmp_path)
+
+            avg_complexity = round(sum(complexity_scores) / len(complexity_scores), 2) if complexity_scores else 0
+            return {
+                'status': 'success', 'original_name': file_obj.name,
+                'processed_url': '',  # no image output for analytics
+                'file_type': 'data', 'mode': 'Frame Analytics (Edge Density)',
+                'frames_analyzed': frame_count,
+                'avg_edge_complexity': avg_complexity,
+                'complexity_rating': ('High' if avg_complexity > 30 else
+                                      'Medium' if avg_complexity > 10 else 'Low'),
+            }
+
+        # Default: FACE_DETECTION (original analytics engine)
+        cap.release()
+        cap = cv2.VideoCapture(tmp_path)
+        return _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url)
+
+    except Exception as e:
+        print(f"    -> [ERROR parsing video] {str(e)}")
+        import traceback; traceback.print_exc()
+        return {'status': 'error', 'error_caught': str(e), 'mode': f'Video {video_mode} Failed'}
+
+
+def _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url) -> dict:
+    """Core face-detection pipeline (original analytics engine, extracted for reuse)."""
+    import cv2, numpy as np, os, tempfile
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    frame_count = total_faces = max_faces = 0
+    best_frame_orig = None
+    best_faces = []
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame_count += 1
+        if best_frame_orig is None:
+            best_frame_orig = frame.copy()
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+        face_count = len(faces)
+        total_faces += face_count
+        if face_count > max_faces:
+            max_faces = face_count
+            best_frame_orig = frame.copy()
+            best_faces = faces
+        if frame_count >= 300:
+            break
+    cap.release()
+
+    temp_out = tempfile.mktemp(suffix='.jpg')
+    if best_frame_orig is not None:
+        final = best_frame_orig.copy()
+        for (x, y, w, h) in best_faces:
+            cv2.rectangle(final, (x, y), (x+w, y+h), (0, 255, 0), 4)
+            cv2.putText(final, "AI: DETECTED", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        cv2.rectangle(final, (0, 0), (1000, 250), (0, 0, 0), -1)
+        cv2.putText(final, "OFFLOAD-X: EDGE COMPUTE ANALYTICS REPORT",
+                    (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
+        cv2.putText(final, f"-> Raw Video Frames Processed: {frame_count}",
+                    (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(final, f"-> Deep Learning Objects Detected: {total_faces}",
+                    (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.imwrite(temp_out, final)
+
+    try:
+        os.remove(tmp_path)
+    except Exception:
+        pass
+
+    out_name = f"offload_edge_report_{timestamp}.jpg"
+    with open(temp_out, 'rb') as f:
+        file_url = save_and_url(f.read(), out_name)
+    os.remove(temp_out)
+
+    return {
+        'status': 'success', 'original_name': file_obj.name,
+        'processed_url': file_url, 'file_type': 'image',
+        'mode': 'Machine Learning Face Tracking',
+        'frames_analyzed': frame_count, 'complexity_score': total_faces,
+    }
 
 
 # =============================================================================

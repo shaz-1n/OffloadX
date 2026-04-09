@@ -3,106 +3,99 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_height="190dp"
+    android:layout_margin="5dp"
     app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="@color/input_stroke_color"
-    app:cardBackgroundColor="@color/card_color"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="#252540"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
-        <!-- Selection checkbox (top-right, hidden by default) -->
-        <FrameLayout
+        <!-- Selection checkbox -->
+        <CheckBox
+            android:id="@+id/cbSelect"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="end|top"
+            android:layout_margin="10dp"
+            android:visibility="gone"
+            app:buttonTint="#2BC0A6"/>
+
+        <!-- Content -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="12dp">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="14dp">
 
-            <!-- File Info at Top -->
+            <!-- Filename -->
+            <TextView
+                android:id="@+id/tvFileName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:lineSpacingMultiplier="1.2"/>
+
+            <!-- File size -->
+            <TextView
+                android:id="@+id/tvFileSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#AAAACC"
+                android:layout_marginTop="5dp"/>
+
+            <!-- Spacer pushes icons to bottom -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <!-- Hidden tvFileDate (needed by adapter) -->
+            <TextView
+                android:id="@+id/tvFileDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"/>
+
+            <!-- Bottom action row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_gravity="start">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <TextView
-                    android:id="@+id/tvFileName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:fontFamily="sans-serif-medium"
-                    android:textColor="@color/text_primary"/>
+                <ImageButton
+                    android:id="@+id/btnDownload"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_nav_download"
+                    app:tint="#2BC0A6"
+                    android:contentDescription="Download"/>
 
-                <TextView
-                    android:id="@+id/tvFileSize"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginTop="2dp"/>
-
-                <TextView
-                    android:id="@+id/tvFileDate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_secondary"
-                    android:visibility="gone"/>
+                <ImageButton
+                    android:id="@+id/btnView"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="6dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_eye"
+                    app:tint="#2BC0A6"
+                    android:contentDescription="View in folder"/>
             </LinearLayout>
 
-            <CheckBox
-                android:id="@+id/cbSelect"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="end|top"
-                android:visibility="gone"
-                app:buttonTint="@color/primary_color"/>
-        </FrameLayout>
-
-        <!-- Spacer for visual weight -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="60dp"/>
-
-        <!-- Bottom row: Download + View buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="12dp"
-            android:gravity="start|center_vertical">
-
-            <!-- Download/Open Button -->
-            <ImageButton
-                android:id="@+id/btnDownload"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_nav_download"
-                app:tint="@color/primary_color"
-                android:contentDescription="Download"/>
-
-            <!-- View/Eye Button -->
-            <ImageButton
-                android:id="@+id/btnView"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_view"
-                app:tint="@color/primary_color"
-                android:contentDescription="View"/>
         </LinearLayout>
-    </LinearLayout>
+    </FrameLayout>
 </com.google.android.material.card.MaterialCardView>

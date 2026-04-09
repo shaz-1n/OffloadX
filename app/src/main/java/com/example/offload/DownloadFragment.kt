@@ -15,8 +15,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+
 
 class DownloadFragment : Fragment(R.layout.fragment_download) {
 
@@ -33,7 +33,7 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
 
         val rvFiles = view.findViewById<RecyclerView>(R.id.rvDownloadList)
         val etSearch = view.findViewById<EditText>(R.id.etSearch)
-        val searchCard = view.findViewById<MaterialCardView>(R.id.searchCard)
+        val searchCard = view.findViewById<LinearLayout>(R.id.searchCard)
         val btnSearch = view.findViewById<ImageButton>(R.id.btnSearch)
         val btnCloseSearch = view.findViewById<ImageButton>(R.id.btnCloseSearch)
         val btnSortHeader = view.findViewById<ImageButton>(R.id.btnSortHeader)
@@ -141,7 +141,7 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
         }
     }
 
-    private fun closeSearch(searchCard: MaterialCardView, etSearch: EditText) {
+    private fun closeSearch(searchCard: LinearLayout, etSearch: EditText) {
         searchCard.animate().alpha(0f).setDuration(150).withEndAction {
             searchCard.visibility = View.GONE
         }.start()

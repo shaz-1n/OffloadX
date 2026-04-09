@@ -232,32 +232,112 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- ═══════════════════════════════════════════════════
+                     ROUTING STRATEGY — replaces old Local / Cloud checkboxes
+                     ═══════════════════════════════════════════════════ -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Processing Environment"
+                    android:text="Routing Strategy"
                     android:textSize="13sp"
                     android:textColor="@color/text_primary_variant"
                     android:layout_marginBottom="8dp"/>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-                    <com.google.android.material.checkbox.MaterialCheckBox
-                        android:id="@+id/cbLocal"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <!-- AUTO button (default selected) -->
+                    <Button
+                        android:id="@+id/btnRoutingAuto"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="⚡ Auto"
+                        android:textColor="@color/white_color"
+                        app:backgroundTint="@color/primary_color"
+                        app:cornerRadius="8dp"
+                        android:layout_marginEnd="4dp" />
+
+                    <!-- MANUAL button (inactive by default) -->
+                    <Button
+                        android:id="@+id/btnRoutingManual"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:text="🎛️ Manual"
+                        android:textColor="@color/text_secondary"
+                        app:backgroundTint="@color/input_bg_color"
+                        app:cornerRadius="8dp"
+                        android:layout_marginStart="4dp"/>
+                </LinearLayout>
+
+                <!-- Auto mode description (shown when Auto is selected) -->
+                <TextView
+                    android:id="@+id/tvAutoRouteInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🤖 Decision Engine will automatically choose the best node (Local / Hub / Cloud) based on battery, network, and file size."
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:visibility="visible"/>
+
+                <!-- Manual sub-options panel (shown when Manual is selected) -->
+                <LinearLayout
+                    android:id="@+id/layoutManualOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Local Storage"
-                        android:textColor="@color/text_primary"
-                        app:buttonTint="@color/primary_color"/>
-                    <com.google.android.material.checkbox.MaterialCheckBox
-                        android:id="@+id/cbCloud"
-                        android:layout_width="wrap_content"
+                        android:text="Select target node:"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="6dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Cloud Offload"
-                        android:textColor="@color/text_primary"
-                        app:buttonTint="@color/primary_color"
-                        android:layout_marginStart="16dp" />
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.checkbox.MaterialCheckBox
+                            android:id="@+id/cbLocal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📱 Local"
+                            android:textColor="@color/text_primary"
+                            app:buttonTint="@color/primary_color"/>
+
+                        <com.google.android.material.checkbox.MaterialCheckBox
+                            android:id="@+id/cbCloud"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="☁️ Hub / Cloud"
+                            android:textColor="@color/text_primary"
+                            app:buttonTint="@color/primary_color"
+                            android:layout_marginStart="16dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvManualRouteInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="📱 Local: Process entirely on-device."
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:paddingStart="4dp"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="4dp"/>
                 </LinearLayout>
 
                 <TextView
@@ -266,7 +346,7 @@
                     android:text="Edge Node (Laptop) IP"
                     android:textSize="13sp"
                     android:textColor="@color/text_primary_variant"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="12dp"
                     android:layout_marginBottom="4dp"/>
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
@@ -293,8 +373,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Big select file container (Replaces small search file icon) -->
-        <!-- Needs id btnSearchFile so UploadFragment.kt still works -->
+        <!-- Big select file container -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/btnSearchFile"
             android:layout_width="match_parent"

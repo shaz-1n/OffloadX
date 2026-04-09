@@ -231,6 +231,16 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                 .show()
         }
 
+        // --- Privacy Policy ---
+        view.findViewById<LinearLayout>(R.id.btnPrivacyPolicyLayout)?.setOnClickListener {
+            showPrivacyPolicyDialog()
+        }
+
+        // --- Help & Support ---
+        view.findViewById<LinearLayout>(R.id.btnHelpSupportLayout)?.setOnClickListener {
+            showHelpSupportDialog()
+        }
+
         // --- Logout ---
         btnLogout.setOnClickListener {
             AlertDialog.Builder(requireContext())
@@ -254,5 +264,119 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                 .setNegativeButton("No", null)
                 .show()
         }
+    }
+
+    // ── Privacy Policy Dialog ─────────────────────────────────────────────────
+    private fun showPrivacyPolicyDialog() {
+        val policy = """
+OffloadX Privacy Policy
+Last updated: April 2026
+
+1. DATA WE COLLECT
+   • Authentication data: your email address and display name via Firebase Auth.
+   • Files you upload for edge processing (images, videos, PDFs, text).
+   • Device metrics: battery level and network type (used locally for routing decisions — never sent to external servers).
+   • Task history: locally stored on your device via SQLite.
+
+2. HOW WE USE YOUR DATA
+   • Files are uploaded to your configured Edge Node (a local server on your own network) or to our simulated cloud endpoint solely for the purpose of processing.
+   • Processed results are stored under the /media/processed/ folder on your Edge Node and are accessible only to you via the app.
+   • We do NOT sell, rent, or share your data with any third parties.
+
+3. DATA STORAGE AND RETENTION
+   • Processed files remain on the Edge Node until you or the server administrator deletes them.
+   • Firebase Auth tokens are managed by Google Firebase and are subject to Google's Privacy Policy.
+   • Local task history can be cleared from the Downloads tab at any time.
+
+4. SECURITY
+   • All hub communication occurs over your local WiFi network.
+   • We recommend running the Edge Node server only on trusted private networks.
+   • No plaintext passwords are stored — authentication is handled by Firebase.
+
+5. YOUR RIGHTS
+   • You may delete your account at any time from the Profile screen, which removes your authentication record from Firebase.
+   • You may clear all local history via the Downloads tab.
+   • For any data removal requests, contact us at offloadxhelp@gmail.com.
+
+6. CHILDREN'S PRIVACY
+   OffloadX is not intended for children under 13. We do not knowingly collect data from minors.
+
+7. CHANGES TO THIS POLICY
+   We may update this policy from time to time. Significant changes will be notified in-app.
+
+8. CONTACT
+   Email: offloadxhelp@gmail.com
+        """.trimIndent()
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("📋 Privacy Policy")
+            .setMessage(policy)
+            .setPositiveButton("Got it", null)
+            .show()
+    }
+
+    // ── Help & Support Dialog ─────────────────────────────────────────────────
+    private fun showHelpSupportDialog() {
+        val helpText = """
+Need help? We're here for you!
+
+📧 Contact Us
+   Email: offloadxhelp@gmail.com
+   Response time: within 24–48 hours
+
+─────────────────────────────
+❓ FREQUENTLY ASKED QUESTIONS
+
+Q: The edge node shows "Not connected"?
+A: Make sure your laptop server is running (run_server.bat) and your phone is on the same WiFi. Set the correct IP in Profile → Hub IP Address.
+
+Q: Processing fails with a timeout?
+A: Large video files may take time. Increase the read timeout or try a smaller file. Make sure the server console shows no errors.
+
+Q: Can I use cloud mode without a laptop?
+A: Yes! Select "⚡ Auto" routing — if WiFi is available and you check "Cloud Backup", it routes to the simulated cloud endpoint automatically.
+
+Q: How do I clear my processed file history?
+A: Go to the Downloads tab → triple-dot menu → Clear All.
+
+Q: What file types are supported?
+A: Images (JPG/PNG/WebP), Videos (MP4/MKV), PDFs, Text/CSV/JSON files, and Word/Excel documents.
+
+Q: Why does the decision engine sometimes pick Local?
+A: The engine picks Local when battery is critically low (≤5%), when the device is offline, or when on mobile data with files >50 MB to save bandwidth.
+
+─────────────────────────────
+🔗 Quick Tips
+• Tap the Edge Node Status "Ping" button in the Dashboard to verify connection.
+• Use "Manual" routing to force a specific node for testing.
+• The Stats tab shows benchmark comparisons between Local, Hub, and Cloud.
+        """.trimIndent()
+
+        val scrollView = android.widget.ScrollView(requireContext())
+        val tv = android.widget.TextView(requireContext()).apply {
+            text = helpText
+            textSize = 13f
+            setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_primary))
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        scrollView.addView(tv)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("🛟 Help & Support")
+            .setView(scrollView)
+            .setPositiveButton("Close", null)
+            .setNeutralButton("Send Email") { _, _ ->
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                        data = android.net.Uri.parse("mailto:offloadxhelp@gmail.com")
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "OffloadX Support Request")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "No email app found. Please email: offloadxhelp@gmail.com", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
     }
 }

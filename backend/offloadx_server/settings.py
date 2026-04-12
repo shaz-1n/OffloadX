@@ -124,6 +124,12 @@ REST_FRAMEWORK = {
 
 
 # =============================================================================
+# Upload Limits (Increased for Heavy Offload Tasks - up to 1GB)
+# =============================================================================
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1048576000
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1048576000
+
+# =============================================================================
 # Firebase Configuration
 # =============================================================================
 # Firebase is the persistent cloud storage layer. The Hub pushes

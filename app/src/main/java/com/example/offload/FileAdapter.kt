@@ -18,6 +18,11 @@ class FileAdapter(
     private val onSelectionChanged: (Int) -> Unit = {}
 ) : RecyclerView.Adapter<FileAdapter.FileViewHolder>() {
 
+    companion object {
+        private const val VIEW_TYPE_LIST = 0
+        private const val VIEW_TYPE_GRID = 1
+    }
+
     var isGridMode = false
     var isSelectionMode = false
         private set
@@ -43,8 +48,12 @@ class FileAdapter(
         val tvExecutionNode: TextView? = itemView.findViewById(R.id.tvExecutionNode)
     }
 
+    override fun getItemViewType(position: Int): Int {
+        return if (isGridMode) VIEW_TYPE_GRID else VIEW_TYPE_LIST
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
-        val layoutRes = if (isGridMode) R.layout.item_file_grid else R.layout.item_file
+        val layoutRes = if (viewType == VIEW_TYPE_GRID) R.layout.item_file_grid else R.layout.item_file
         val view = LayoutInflater.from(parent.context).inflate(layoutRes, parent, false)
         return FileViewHolder(view)
     }
@@ -71,11 +80,24 @@ class FileAdapter(
             icon.setImageResource(iconRes)
         }
 
+        // Validate physical file presence before finalizing button UI
+        // If they downloaded it then went into File Explorer and deleted it, the app should unfreeze the download state
+        if (currentFile.isDownloaded && currentFile.processedUrl.isNotEmpty()) {
+            val fileInDownloads = java.io.File(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                currentFile.fileName
+            )
+            if (!fileInDownloads.exists()) {
+                currentFile.isDownloaded = false
+            }
+        }
+
         // Download button state
         if (currentFile.isDownloaded) {
-            holder.btnDownload.setImageResource(android.R.drawable.ic_menu_view)
+            // Keep the download icon but gray it out to show it's already saved locally
+            holder.btnDownload.setImageResource(R.drawable.ic_nav_download)
             holder.btnDownload.imageTintList = android.content.res.ColorStateList.valueOf(
-                androidx.core.content.ContextCompat.getColor(holder.itemView.context, android.R.color.holo_blue_dark)
+                android.graphics.Color.GRAY
             )
         } else {
             holder.btnDownload.setImageResource(R.drawable.ic_nav_download)
@@ -92,6 +114,12 @@ class FileAdapter(
             onSelectionChanged(selectedPositions.size)
         }
 
+        // If in Grid View (no detail panel), directly show description and task parameters unconditionally
+        if (holder.detailPanel == null) {
+            holder.tvDescription?.text = currentFile.description.ifEmpty { "No description provided" }
+            holder.tvTaskType?.text = "Process: ${currentFile.taskType.ifEmpty { "Unknown" }}"
+        }
+
         // Expand/collapse detail panel (list mode only)
         holder.detailPanel?.let { panel ->
             val isExpanded = expandedPositions.contains(position)
@@ -106,9 +134,9 @@ class FileAdapter(
                 // Show where processing ran — pill badge tinted per tier
                 holder.tvExecutionNode?.let { tv ->
                     val (label, tintHex) = when (currentFile.executionNode.uppercase()) {
-                        "HUB"   -> Pair("🖥  Hub (Local Edge Node)",    "#CC2BC0A6")  // teal
-                        "CLOUD" -> Pair("☁  Cloud (Simulated)",          "#CC7B52DD")  // purple
-                        else    -> Pair("📱  Device (Local)",             "#CC888888")  // grey
+                        "HUB"   -> Pair("Hub (Local Edge Node)",    "#CC2BC0A6")  // teal
+                        "CLOUD" -> Pair("Cloud (Simulated)",          "#CC7B52DD")  // purple
+                        else    -> Pair("Device (Local)",             "#CC888888")  // grey
                     }
                     tv.text = label
                     tv.setTextColor(android.graphics.Color.WHITE)
@@ -167,7 +195,7 @@ class FileAdapter(
                 }
             } else if (currentFile.executionNode.uppercase() == "LOCAL") {
                 Toast.makeText(holder.itemView.context,
-                    "📱 Processed locally — results are computed on-device only. No file to preview.",
+                    "Processed locally - results are computed on-device only. No file to preview.",
                     Toast.LENGTH_LONG).show()
             } else if (currentFile.isDownloaded) {
                 try {
@@ -185,53 +213,136 @@ class FileAdapter(
 
         // Download button — downloads the file via DownloadManager, then opens it
         holder.btnDownload.setOnClickListener {
-            // If already downloaded, open it
+            // Check immediately on click: did they delete it while the app was sitting here?
             if (currentFile.isDownloaded && currentFile.processedUrl.isNotEmpty()) {
-                try {
-                    val intent = android.content.Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
-                    holder.itemView.context.startActivity(intent)
-                } catch (e: Exception) {
-                    Toast.makeText(holder.itemView.context, "Open Downloads folder to view.", Toast.LENGTH_SHORT).show()
+                val existCheck = java.io.File(
+                    android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                    currentFile.fileName
+                )
+                if (existCheck.exists()) {
+                    try {
+                        val intent = android.content.Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
+                        holder.itemView.context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(holder.itemView.context, "Open Downloads folder to view.", Toast.LENGTH_SHORT).show()
+                    }
+                    return@setOnClickListener
+                } else {
+                    // They deleted it from the gallery! Reset the state and fall through to redownload
+                    currentFile.isDownloaded = false
+                    notifyItemChanged(position)
                 }
-                return@setOnClickListener
             }
 
             val url = currentFile.processedUrl
             if (url.isEmpty() || !url.startsWith("http")) {
                 val msg = when (currentFile.executionNode.uppercase()) {
-                    "LOCAL" -> "📱 Processed locally on device — no server file to download."
+                    "LOCAL" -> "Processed locally on device - no server file to download."
                     else    -> "Download link unavailable. The task may have failed on the server."
                 }
                 Toast.makeText(holder.itemView.context, msg, Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
 
-            Toast.makeText(holder.itemView.context, "Downloading ${currentFile.fileName}...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(holder.itemView.context, "Downloading result... Pull down notification bar for live progress & file size!", Toast.LENGTH_LONG).show()
             holder.btnDownload.setImageResource(android.R.drawable.ic_popup_sync)
             holder.btnDownload.isEnabled = false
 
             try {
-                // Determine MIME for DownloadManager so Android knows how to open it
-                val mime = getMimeType(currentFile.fileType)
                 val uri = android.net.Uri.parse(url)
+                
+                // Generate clean, readable filename based exactly on original upload, eg: "video.mp4"
+                val finalFileName = currentFile.fileName
+
+                // Force-wipe any ghost file in the Downloads directory matching this name to bypass DownloadManager conflict blocks
+                val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val existingFile = java.io.File(downloadDir, finalFileName)
+                if (existingFile.exists()) {
+                    existingFile.delete()
+                }
+
+                // Determine MIME for DownloadManager so Android knows how to open it
+                val urlExt = url.substringAfterLast('.', "")
+                val mime = if (urlExt.isNotEmpty() && urlExt.length <= 4) {
+                    getMimeType(urlExt)
+                } else {
+                    getMimeType(currentFile.fileType)
+                }
+                
                 val request = android.app.DownloadManager.Request(uri)
                 request.setTitle(currentFile.fileName)
                 request.setDescription("OffloadX Edge-Computed Result")
                 request.setMimeType(mime)
                 request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
                 request.setDestinationInExternalPublicDir(
                     android.os.Environment.DIRECTORY_DOWNLOADS,
-                    "${System.currentTimeMillis()}_${currentFile.fileName}"
+                    finalFileName
                 )
                 val dm = holder.itemView.context.getSystemService(android.content.Context.DOWNLOAD_SERVICE)
                         as android.app.DownloadManager
-                dm.enqueue(request)
+                val downloadId = dm.enqueue(request)
 
-                holder.itemView.postDelayed({
-                    currentFile.isDownloaded = true
-                    onDownloadSuccess(currentFile.processedUrl)
-                    notifyItemChanged(position)
-                }, 1500)
+                // Start an inline thread to query DownloadManager and give real-time updates directly into the UI card
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                var isDownloading = true
+                holder.tvFileSize.text = "Starting..."
+
+                Thread {
+                    while (isDownloading) {
+                        try {
+                            val q = android.app.DownloadManager.Query()
+                            q.setFilterById(downloadId)
+                            val cursor = dm.query(q)
+                            if (cursor != null && cursor.moveToFirst()) {
+                                val statusIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
+                                val downloadedIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                                val totalIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                                
+                                if (statusIndex >= 0 && downloadedIndex >= 0 && totalIndex >= 0) {
+                                    val status = cursor.getInt(statusIndex)
+                                    val bytesDownloaded = cursor.getInt(downloadedIndex)
+                                    val bytesTotal = cursor.getInt(totalIndex)
+                                    
+                                    if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                                        isDownloading = false
+                                        val finalMb = "%.2f".format(bytesTotal.toFloat() / (1024 * 1024))
+                                        handler.post { 
+                                            holder.tvFileSize.text = "$finalMb MB (Saved)" 
+                                            holder.btnDownload.isEnabled = true
+                                            holder.btnDownload.setImageResource(R.drawable.ic_nav_download)
+                                            holder.btnDownload.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.GRAY)
+                                            currentFile.isDownloaded = true
+                                            onDownloadSuccess(currentFile.processedUrl)
+                                        }
+                                    } else if (status == android.app.DownloadManager.STATUS_FAILED) {
+                                        isDownloading = false
+                                        handler.post { 
+                                            holder.tvFileSize.text = "Download Failed" 
+                                            holder.btnDownload.isEnabled = true
+                                            holder.btnDownload.setImageResource(R.drawable.ic_nav_download)
+                                        }
+                                    } else {
+                                        if (bytesTotal > 0) {
+                                            val progress = ((bytesDownloaded * 100L) / bytesTotal).toInt()
+                                            val megaBytes = "%.2f".format(bytesDownloaded.toFloat() / (1024 * 1024))
+                                            val totalMegaBytes = "%.2f".format(bytesTotal.toFloat() / (1024 * 1024))
+                                            handler.post { holder.tvFileSize.text = "$progress% ($megaBytes MB)" }
+                                        } else {
+                                            handler.post { holder.tvFileSize.text = "Downloading..." }
+                                        }
+                                    }
+                                }
+                                cursor.close()
+                            } else {
+                                isDownloading = false
+                            }
+                        } catch (e: Exception) {
+                            isDownloading = false
+                        }
+                        if (isDownloading) Thread.sleep(300)
+                    }
+                }.start()
             } catch (e: Exception) {
                 Toast.makeText(holder.itemView.context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
                 holder.btnDownload.isEnabled = true

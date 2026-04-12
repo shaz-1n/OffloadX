@@ -4,30 +4,33 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import com.example.offload.databinding.FragmentChangePasswordBinding
+import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 
 class ChangePasswordFragment : Fragment() {
 
-    private var _binding: FragmentChangePasswordBinding? = null
-    private val binding get() = _binding!!
+    private var etNewPassword: TextInputEditText? = null
+    private var btnUpdatePassword: Button? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentChangePasswordBinding.inflate(inflater, container, false)
-        return binding.root
+    ): View? {
+        return inflater.inflate(R.layout.fragment_change_password, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.btnUpdatePassword.setOnClickListener {
-            val newPass = binding.etNewPassword.text.toString()
+        etNewPassword = view.findViewById(R.id.etNewPassword)
+        btnUpdatePassword = view.findViewById(R.id.btnUpdatePassword)
+
+        btnUpdatePassword?.setOnClickListener {
+            val newPass = etNewPassword?.text.toString()
 
             // Validation
             if (newPass.isEmpty()) {
@@ -46,8 +49,8 @@ class ChangePasswordFragment : Fragment() {
             // Firebase: Update password
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
-                binding.btnUpdatePassword.isEnabled = false
-                binding.btnUpdatePassword.text = "Updating..."
+                btnUpdatePassword?.isEnabled = false
+                btnUpdatePassword?.text = "Updating..."
 
                 user.updatePassword(newPass)
                     .addOnCompleteListener { task ->
@@ -59,8 +62,8 @@ class ChangePasswordFragment : Fragment() {
                             val error = task.exception?.message ?: "Failed to update password"
                             Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show()
                         }
-                        binding.btnUpdatePassword.isEnabled = true
-                        binding.btnUpdatePassword.text = "Update"
+                        btnUpdatePassword?.isEnabled = true
+                        btnUpdatePassword?.text = "Update"
                     }
             } else {
                 Toast.makeText(requireContext(), "Not logged in!", Toast.LENGTH_SHORT).show()
@@ -70,6 +73,7 @@ class ChangePasswordFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null
+        etNewPassword = null
+        btnUpdatePassword = null
     }
 }

@@ -39,3 +39,4 @@ serviceAccountKey.json
 google-services.json
 firebase-debug.log
 .vscode/
+*.pt

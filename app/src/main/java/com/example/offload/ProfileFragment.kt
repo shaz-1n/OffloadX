@@ -309,7 +309,7 @@ Last updated: April 2026
         """.trimIndent()
 
         AlertDialog.Builder(requireContext())
-            .setTitle("📋 Privacy Policy")
+            .setTitle("Privacy Policy")
             .setMessage(policy)
             .setPositiveButton("Got it", null)
             .show()
@@ -320,12 +320,12 @@ Last updated: April 2026
         val helpText = """
 Need help? We're here for you!
 
-📧 Contact Us
+Contact Us
    Email: offloadxhelp@gmail.com
    Response time: within 24–48 hours
 
 ─────────────────────────────
-❓ FREQUENTLY ASKED QUESTIONS
+FREQUENTLY ASKED QUESTIONS
 
 Q: The edge node shows "Not connected"?
 A: Make sure your laptop server is running (run_server.bat) and your phone is on the same WiFi. Set the correct IP in Profile → Hub IP Address.
@@ -334,7 +334,7 @@ Q: Processing fails with a timeout?
 A: Large video files may take time. Increase the read timeout or try a smaller file. Make sure the server console shows no errors.
 
 Q: Can I use cloud mode without a laptop?
-A: Yes! Select "⚡ Auto" routing — if WiFi is available and you check "Cloud Backup", it routes to the simulated cloud endpoint automatically.
+A: Yes! Select "Auto" routing - if WiFi is available and you check "Cloud Backup", it routes to the simulated cloud endpoint automatically.
 
 Q: How do I clear my processed file history?
 A: Go to the Downloads tab → triple-dot menu → Clear All.
@@ -343,10 +343,10 @@ Q: What file types are supported?
 A: Images (JPG/PNG/WebP), Videos (MP4/MKV), PDFs, Text/CSV/JSON files, and Word/Excel documents.
 
 Q: Why does the decision engine sometimes pick Local?
-A: The engine picks Local when battery is critically low (≤5%), when the device is offline, or when on mobile data with files >50 MB to save bandwidth.
+A: The engine picks Local when battery is critically low (<=5%), when the device is offline, or when on mobile data with files >50 MB to save bandwidth.
 
 ─────────────────────────────
-🔗 Quick Tips
+Quick Tips
 • Tap the Edge Node Status "Ping" button in the Dashboard to verify connection.
 • Use "Manual" routing to force a specific node for testing.
 • The Stats tab shows benchmark comparisons between Local, Hub, and Cloud.
@@ -363,7 +363,7 @@ A: The engine picks Local when battery is critically low (≤5%), when the devic
         scrollView.addView(tv)
 
         AlertDialog.Builder(requireContext())
-            .setTitle("🛟 Help & Support")
+            .setTitle(" Help & Support")
             .setView(scrollView)
             .setPositiveButton("Close", null)
             .setNeutralButton("Send Email") { _, _ ->

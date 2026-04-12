@@ -6,11 +6,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import com.example.offload.databinding.FragmentStatsBinding
+import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
@@ -27,24 +30,69 @@ import java.net.URL
 
 class StatsFragment : Fragment() {
 
-    private var _binding: FragmentStatsBinding? = null
-    private val binding get() = _binding!!
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var logRepo: OffloadLogRepository
+
+    // View references (using findViewById to avoid ViewBinding crash)
+    private var tvTasksDone: TextView? = null
+    private var tvTotalData: TextView? = null
+    private var tvAvgTime: TextView? = null
+    private var tvSystemHealth: TextView? = null
+    private var performanceChart: BarChart? = null
+    private var btnPingNode: Button? = null
+    private var btnRunBenchmark: Button? = null
+    private var btnRefreshReport: Button? = null
+    private var tvNodeStatus: TextView? = null
+    private var tvNodeLatency: TextView? = null
+    private var tvNodeStorage: TextView? = null
+    private var tvNodeProcessor: TextView? = null
+    private var statusDot: View? = null
+    private var tvBenchmarkStatus: TextView? = null
+    private var layoutBenchmarkResults: LinearLayout? = null
+    private var tvBenchLocalMs: TextView? = null
+    private var tvBenchHubMs: TextView? = null
+    private var benchmarkChart: BarChart? = null
+    private var tvBenchmarkWinner: TextView? = null
+    private var tvReportSummary: TextView? = null
+    private var reportChart: BarChart? = null
+    private var tvFastestMethod: TextView? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentStatsBinding.inflate(inflater, container, false)
-        return binding.root
+    ): View? {
+        return inflater.inflate(R.layout.fragment_stats, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         logRepo = OffloadLogRepository(requireContext())
+
+        // Find all views manually
+        tvTasksDone = view.findViewById(R.id.tvTasksDone)
+        tvTotalData = view.findViewById(R.id.tvTotalData)
+        tvAvgTime = view.findViewById(R.id.tvAvgTime)
+        tvSystemHealth = view.findViewById(R.id.tvSystemHealth)
+        performanceChart = view.findViewById(R.id.performanceChart)
+        btnPingNode = view.findViewById(R.id.btnPingNode)
+        btnRunBenchmark = view.findViewById(R.id.btnRunBenchmark)
+        btnRefreshReport = view.findViewById(R.id.btnRefreshReport)
+        tvNodeStatus = view.findViewById(R.id.tvNodeStatus)
+        tvNodeLatency = view.findViewById(R.id.tvNodeLatency)
+        tvNodeStorage = view.findViewById(R.id.tvNodeStorage)
+        tvNodeProcessor = view.findViewById(R.id.tvNodeProcessor)
+        statusDot = view.findViewById(R.id.statusDot)
+        tvBenchmarkStatus = view.findViewById(R.id.tvBenchmarkStatus)
+        layoutBenchmarkResults = view.findViewById(R.id.layoutBenchmarkResults)
+        tvBenchLocalMs = view.findViewById(R.id.tvBenchLocalMs)
+        tvBenchHubMs = view.findViewById(R.id.tvBenchHubMs)
+        benchmarkChart = view.findViewById(R.id.benchmarkChart)
+        tvBenchmarkWinner = view.findViewById(R.id.tvBenchmarkWinner)
+        tvReportSummary = view.findViewById(R.id.tvReportSummary)
+        reportChart = view.findViewById(R.id.reportChart)
+        tvFastestMethod = view.findViewById(R.id.tvFastestMethod)
 
         // Observe files for real statistics
         viewModel.downloadableFiles.observe(viewLifecycleOwner) { files ->
@@ -53,32 +101,30 @@ class StatsFragment : Fragment() {
         }
 
         // Ping button
-        binding.btnPingNode.setOnClickListener {
+        btnPingNode?.setOnClickListener {
             pingEdgeNode()
         }
 
         // Benchmark button
-        binding.btnRunBenchmark.setOnClickListener {
+        btnRunBenchmark?.setOnClickListener {
             runLocalVsHubBenchmark()
         }
 
         // Report refresh button
-        binding.btnRefreshReport.setOnClickListener {
+        btnRefreshReport?.setOnClickListener {
             loadReportFromDb()
         }
 
         // Load report on first view
         loadReportFromDb()
 
-        // Auto-ping edge node so connection status is always fresh
-        // when user navigates to this tab from elsewhere in the app.
+        // Auto-ping edge node
         pingEdgeNode()
     }
 
     override fun onResume() {
         super.onResume()
-        // Re-ping whenever the fragment becomes visible (e.g. after switching tabs)
-        if (_binding != null) {
+        if (btnPingNode != null) {
             pingEdgeNode()
         }
     }
@@ -89,41 +135,38 @@ class StatsFragment : Fragment() {
 
     private fun updateStatistics(files: List<FileModel>) {
         val totalTasks = files.size
-        binding.tvTasksDone.text = totalTasks.toString()
+        tvTasksDone?.text = totalTasks.toString()
 
-        // Total data offloaded
         val totalMB = files.sumOf { it.dataSizeMB }
-        binding.tvTotalData.text = if (totalMB > 1024) {
+        tvTotalData?.text = if (totalMB > 1024) {
             "${"%.1f".format(totalMB / 1024)} GB"
         } else {
             "${"%.1f".format(totalMB)} MB"
         }
 
-        // Average processing time
         val timesWithData = files.filter { it.processingTimeMs > 0 }
         if (timesWithData.isNotEmpty()) {
             val avgMs = timesWithData.map { it.processingTimeMs }.average()
-            binding.tvAvgTime.text = if (avgMs > 1000) {
+            tvAvgTime?.text = if (avgMs > 1000) {
                 "${"%.1f".format(avgMs / 1000)}s"
             } else {
                 "${avgMs.toLong()}ms"
             }
         } else {
-            binding.tvAvgTime.text = "— ms"
+            tvAvgTime?.text = "-- ms"
         }
 
-        // System health summary
         if (totalTasks == 0) {
-            binding.tvSystemHealth.text = "No metrics gathered yet. Upload a file to the Edge Node to begin."
+            tvSystemHealth?.text = "No metrics gathered yet. Upload a file to the Edge Node to begin."
         } else {
             val downloaded = files.count { it.isDownloaded }
             val types = files.groupBy { it.taskType }.map { "${it.value.size} ${it.key}" }.joinToString(", ")
-            binding.tvSystemHealth.text = "Processed $totalTasks total tasks ($types). $downloaded results downloaded locally. Edge routing and hardware acceleration operational."
+            tvSystemHealth?.text = "Processed $totalTasks total tasks ($types). $downloaded results downloaded locally. Edge routing and hardware acceleration operational."
         }
     }
 
     private fun setupChart(files: List<FileModel>) {
-        val chart = binding.performanceChart
+        val chart = performanceChart ?: return
         chart.description.isEnabled = false
         chart.setDrawGridBackground(false)
         chart.legend.isEnabled = true
@@ -180,22 +223,17 @@ class StatsFragment : Fragment() {
     // Local vs Hub Benchmark
     // -------------------------------------------------------------------------
 
-    /**
-     * Runs a 400x400 matrix-transpose computation 20x on-device (LOCAL),
-     * then sends the same COMPOSITE workload to /api/compute/ (HUB)
-     * and /api/cloud/compute/ (CLOUD) for a 3-way comparison chart.
-     */
     private fun runLocalVsHubBenchmark() {
         val prefs = requireActivity().getSharedPreferences("OffloadXPrefs", android.content.Context.MODE_PRIVATE)
         val ip = prefs.getString("hub_ip", "192.168.1.100:8000") ?: "192.168.1.100:8000"
         val baseUrl = if (ip.startsWith("http")) ip else "http://$ip"
 
-        binding.btnRunBenchmark.isEnabled = false
-        binding.btnRunBenchmark.text = "Running…"
-        binding.tvBenchmarkStatus.text = "⏳ Step 1/3 — Measuring on-device compute…"
-        binding.layoutBenchmarkResults.visibility = View.GONE
-        binding.benchmarkChart.visibility = View.GONE
-        binding.tvBenchmarkWinner.visibility = View.GONE
+        btnRunBenchmark?.isEnabled = false
+        btnRunBenchmark?.text = "Running..."
+        tvBenchmarkStatus?.text = "Step 1/3 - Measuring on-device compute..."
+        layoutBenchmarkResults?.visibility = View.GONE
+        benchmarkChart?.visibility = View.GONE
+        tvBenchmarkWinner?.visibility = View.GONE
 
         CoroutineScope(Dispatchers.Default).launch {
             // --- PHASE 1: Local CPU benchmark ---
@@ -204,7 +242,7 @@ class StatsFragment : Fragment() {
             val localMs = System.currentTimeMillis() - localStart
 
             withContext(Dispatchers.Main) {
-                binding.tvBenchmarkStatus.text = "✅ Local: ${localMs}ms  |  ⏳ Step 2/3 — Sending to Hub…"
+                tvBenchmarkStatus?.text = "Local: ${localMs}ms  |  Step 2/3 - Sending to Hub..."
             }
 
             // --- PHASE 2: Hub benchmark ---
@@ -243,7 +281,7 @@ class StatsFragment : Fragment() {
             }
 
             withContext(Dispatchers.Main) {
-                binding.tvBenchmarkStatus.text = "✅ Local: ${localMs}ms  |  ✅ Hub: ${if (hubMs > 0) "${hubMs}ms" else "Error"}  |  ⏳ Step 3/3 — Sending to Cloud…"
+                tvBenchmarkStatus?.text = "Local: ${localMs}ms  |  Hub: ${if (hubMs > 0) "${hubMs}ms" else "Error"}  |  Step 3/3 - Sending to Cloud..."
             }
 
             // --- PHASE 3: Cloud benchmark ---
@@ -300,16 +338,18 @@ class StatsFragment : Fragment() {
 
             // --- Update UI ---
             withContext(Dispatchers.Main) {
-                binding.btnRunBenchmark.isEnabled = true
-                binding.btnRunBenchmark.text = "Run Test"
+                if (!isAdded) return@withContext
+
+                btnRunBenchmark?.isEnabled = true
+                btnRunBenchmark?.text = "Run Test"
 
                 val hubLabel   = if (hubError != null)   "Error" else "${hubMs}ms"
                 val cloudLabel = if (cloudError != null) "Error" else "${cloudMs}ms"
-                binding.tvBenchmarkStatus.text = "Local: ${localMs}ms  |  Hub: $hubLabel  |  Cloud: $cloudLabel"
+                tvBenchmarkStatus?.text = "Local: ${localMs}ms  |  Hub: $hubLabel  |  Cloud: $cloudLabel"
 
-                binding.tvBenchLocalMs.text = "${localMs}ms"
-                binding.tvBenchHubMs.text   = if (hubError != null) "Err" else "${hubMs}ms"
-                binding.layoutBenchmarkResults.visibility = View.VISIBLE
+                tvBenchLocalMs?.text = "${localMs}ms"
+                tvBenchHubMs?.text   = if (hubError != null) "Err" else "${hubMs}ms"
+                layoutBenchmarkResults?.visibility = View.VISIBLE
 
                 showBenchmarkChart(localMs, if (hubMs > 0) hubMs else 0L, if (cloudMs > 0) cloudMs else 0L)
 
@@ -317,13 +357,13 @@ class StatsFragment : Fragment() {
                 if (hubMs > 0)   validTimes["Hub"]   = hubMs
                 if (cloudMs > 0) validTimes["Cloud"] = cloudMs
                 val winner = validTimes.minByOrNull { it.value }
-                binding.tvBenchmarkWinner.text = when (winner?.key) {
-                    "Local" -> "📱 Local is fastest for this workload size"
-                    "Hub"   -> "🖥️ Hub is fastest — offloading pays off!"
-                    "Cloud" -> "☁️ Cloud is fastest in this run"
-                    else    -> "⚖️ Could not determine winner"
+                tvBenchmarkWinner?.text = when (winner?.key) {
+                    "Local" -> "Local is fastest for this workload size"
+                    "Hub"   -> "Hub is fastest - offloading pays off"
+                    "Cloud" -> "Cloud is fastest in this run"
+                    else    -> "Could not determine winner"
                 }
-                binding.tvBenchmarkWinner.visibility = View.VISIBLE
+                tvBenchmarkWinner?.visibility = View.VISIBLE
 
                 loadReportFromDb()
             }
@@ -331,7 +371,7 @@ class StatsFragment : Fragment() {
     }
 
     private fun showBenchmarkChart(localMs: Long, hubMs: Long, cloudMs: Long = 0L) {
-        val chart = binding.benchmarkChart
+        val chart = benchmarkChart ?: return
         chart.description.isEnabled = false
         chart.legend.isEnabled = true
         chart.setTouchEnabled(false)
@@ -389,7 +429,7 @@ class StatsFragment : Fragment() {
         chart.animateY(600)
     }
 
-    /** Same 400×400 matrix-transpose × 20 used in UploadFragment's local path. */
+    /** Same 400x400 matrix-transpose x 20 used in UploadFragment's local path. */
     private fun runMatrixBenchmark() {
         val size = 400
         val matrix = Array(size) { r -> IntArray(size) { c -> r * size + c } }
@@ -409,9 +449,9 @@ class StatsFragment : Fragment() {
         val ip = prefs.getString("hub_ip", "192.168.1.100:8000") ?: "192.168.1.100:8000"
         val baseUrl = if (ip.startsWith("http")) ip else "http://$ip"
 
-        binding.btnPingNode.isEnabled = false
-        binding.btnPingNode.text = "..."
-        binding.tvNodeStatus.text = "Pinging $ip..."
+        btnPingNode?.isEnabled = false
+        btnPingNode?.text = "..."
+        tvNodeStatus?.text = "Pinging $ip..."
 
         CoroutineScope(Dispatchers.IO).launch {
             val startTime = System.currentTimeMillis()
@@ -430,29 +470,33 @@ class StatsFragment : Fragment() {
                     val json = JSONObject(body)
 
                     withContext(Dispatchers.Main) {
-                        binding.tvNodeLatency.text = "${latencyMs}ms"
-                        binding.tvNodeStorage.text = json.optString("free_storage", "—")
-                        binding.tvNodeProcessor.text = json.optString("processor", "CPU")
-                        binding.tvNodeStatus.text = "Connected to $ip | ${json.optString("os", "Unknown OS")}"
+                        if (!isAdded) return@withContext
+                        tvNodeLatency?.text = "${latencyMs}ms"
+                        tvNodeStorage?.text = json.optString("free_storage", "--")
+                        tvNodeProcessor?.text = json.optString("processor", "CPU")
+                        tvNodeStatus?.text = "Connected to $ip | ${json.optString("os", "Unknown OS")}"
 
-                        val dot = binding.statusDot
-                        val shape = GradientDrawable()
-                        shape.shape = GradientDrawable.OVAL
-                        shape.setColor(ContextCompat.getColor(requireContext(), R.color.primary_color))
-                        dot.background = shape
+                        statusDot?.let { dot ->
+                            val shape = GradientDrawable()
+                            shape.shape = GradientDrawable.OVAL
+                            shape.setColor(ContextCompat.getColor(requireContext(), R.color.primary_color))
+                            dot.background = shape
+                        }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        binding.tvNodeLatency.text = "${latencyMs}ms"
-                        binding.tvNodeStatus.text = "Connected (basic). System info not available."
-                        binding.tvNodeStorage.text = "—"
-                        binding.tvNodeProcessor.text = "—"
+                        if (!isAdded) return@withContext
+                        tvNodeLatency?.text = "${latencyMs}ms"
+                        tvNodeStatus?.text = "Connected (basic). System info not available."
+                        tvNodeStorage?.text = "--"
+                        tvNodeProcessor?.text = "--"
 
-                        val dot = binding.statusDot
-                        val shape = GradientDrawable()
-                        shape.shape = GradientDrawable.OVAL
-                        shape.setColor(Color.parseColor("#FFA726"))
-                        dot.background = shape
+                        statusDot?.let { dot ->
+                            val shape = GradientDrawable()
+                            shape.shape = GradientDrawable.OVAL
+                            shape.setColor(Color.parseColor("#FFA726"))
+                            dot.background = shape
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -465,55 +509,54 @@ class StatsFragment : Fragment() {
                     val code = conn2.responseCode
 
                     withContext(Dispatchers.Main) {
-                        binding.tvNodeLatency.text = "${latencyMs}ms"
-                        binding.tvNodeStatus.text = "Server reachable at $ip (HTTP $code). Add /api/system-info/ for full stats."
-                        binding.tvNodeStorage.text = "—"
-                        binding.tvNodeProcessor.text = "—"
+                        if (!isAdded) return@withContext
+                        tvNodeLatency?.text = "${latencyMs}ms"
+                        tvNodeStatus?.text = "Server reachable at $ip (HTTP $code). Add /api/system-info/ for full stats."
+                        tvNodeStorage?.text = "--"
+                        tvNodeProcessor?.text = "--"
 
-                        val dot = binding.statusDot
-                        val shape = GradientDrawable()
-                        shape.shape = GradientDrawable.OVAL
-                        shape.setColor(Color.parseColor("#FFA726"))
-                        dot.background = shape
+                        statusDot?.let { dot ->
+                            val shape = GradientDrawable()
+                            shape.shape = GradientDrawable.OVAL
+                            shape.setColor(Color.parseColor("#FFA726"))
+                            dot.background = shape
+                        }
                     }
                 } catch (e2: Exception) {
                     withContext(Dispatchers.Main) {
-                        binding.tvNodeLatency.text = "—"
-                        binding.tvNodeStatus.text = "Cannot reach Edge Node at $ip. Check IP and ensure the server is running."
-                        binding.tvNodeStorage.text = "—"
-                        binding.tvNodeProcessor.text = "—"
+                        if (!isAdded) return@withContext
+                        tvNodeLatency?.text = "--"
+                        tvNodeStatus?.text = "Cannot reach Edge Node at $ip. Check IP and ensure the server is running."
+                        tvNodeStorage?.text = "--"
+                        tvNodeProcessor?.text = "--"
 
-                        val dot = binding.statusDot
-                        val shape = GradientDrawable()
-                        shape.shape = GradientDrawable.OVAL
-                        shape.setColor(ContextCompat.getColor(requireContext(), R.color.danger_color))
-                        dot.background = shape
+                        statusDot?.let { dot ->
+                            val shape = GradientDrawable()
+                            shape.shape = GradientDrawable.OVAL
+                            shape.setColor(ContextCompat.getColor(requireContext(), R.color.danger_color))
+                            dot.background = shape
+                        }
                     }
                 }
             } finally {
                 withContext(Dispatchers.Main) {
-                    binding.btnPingNode.isEnabled = true
-                    binding.btnPingNode.text = "Ping"
+                    if (!isAdded) return@withContext
+                    btnPingNode?.isEnabled = true
+                    btnPingNode?.text = "Ping"
                 }
             }
         }
     }
 
     // -------------------------------------------------------------------------
-    // Report Section — grouped bar chart from SQLite
+    // Report Section
     // -------------------------------------------------------------------------
 
-    /**
-     * Queries the SQLite execution log on a background thread, then renders
-     * a grouped bar chart comparing average elapsed time for each processing
-     * node (LOCAL / HUB / CLOUD) grouped by data type.
-     */
     private fun loadReportFromDb() {
         CoroutineScope(Dispatchers.IO).launch {
             val report = logRepo.getPerformanceReport()
             val stats  = logRepo.getOverallStats()
 
-            // Determine fastest method for each data type
             val dataTypes = listOf("SIMPLE", "COMPOSITE", "COMPLEX")
             val fastestMap = mutableMapOf<String, OffloadLogRepository.FastestResult?>()
             for (dt in dataTypes) {
@@ -521,59 +564,53 @@ class StatsFragment : Fragment() {
             }
 
             withContext(Dispatchers.Main) {
+                if (!isAdded) return@withContext
+
                 if (report.isEmpty()) {
-                    binding.tvReportSummary.text = "No execution logs yet. Run an upload or benchmark to populate."
-                    binding.reportChart.visibility = View.GONE
-                    binding.tvFastestMethod.visibility = View.GONE
+                    tvReportSummary?.text = "No execution logs yet. Run an upload or benchmark to populate."
+                    reportChart?.visibility = View.GONE
+                    tvFastestMethod?.visibility = View.GONE
                     return@withContext
                 }
 
-                // Summary text
                 val summaryParts = mutableListOf<String>()
                 summaryParts.add("${stats.totalTasks} total runs")
                 summaryParts.add("${stats.successCount} succeeded")
                 if (stats.failureCount > 0) summaryParts.add("${stats.failureCount} failed")
                 summaryParts.add("avg ${"%.0f".format(stats.avgElapsedMs)}ms")
-                binding.tvReportSummary.text = summaryParts.joinToString(" • ")
+                tvReportSummary?.text = summaryParts.joinToString(" | ")
 
-                // Fastest method annotation
                 val fastestLines = mutableListOf<String>()
                 for ((dt, result) in fastestMap) {
                     if (result != null) {
-                        val icon = when (result.processingNode) {
-                            "LOCAL" -> "\uD83D\uDCF1"
-                            "HUB"   -> "\uD83D\uDDA5\uFE0F"
-                            "CLOUD" -> "\u2601\uFE0F"
-                            else    -> "\u2022"
+                        val label = when (result.processingNode) {
+                            "LOCAL" -> "Local"
+                            "HUB"   -> "Hub"
+                            "CLOUD" -> "Cloud"
+                            else    -> result.processingNode
                         }
-                        fastestLines.add("$icon $dt → ${result.processingNode} (${"%.0f".format(result.averageMs)}ms avg, ${result.runCount} runs)")
+                        fastestLines.add("$dt -> $label (${"%.0f".format(result.averageMs)}ms avg, ${result.runCount} runs)")
                     }
                 }
                 if (fastestLines.isNotEmpty()) {
-                    binding.tvFastestMethod.text = "Fastest Method:\n" + fastestLines.joinToString("\n")
-                    binding.tvFastestMethod.visibility = View.VISIBLE
+                    tvFastestMethod?.text = "Fastest Method:\n" + fastestLines.joinToString("\n")
+                    tvFastestMethod?.visibility = View.VISIBLE
                 } else {
-                    binding.tvFastestMethod.visibility = View.GONE
+                    tvFastestMethod?.visibility = View.GONE
                 }
 
-                // Build grouped bar chart
                 setupReportChart(report)
             }
         }
     }
 
-    /**
-     * Renders a grouped bar chart: X‑axis = data types, bars = processing nodes.
-     * Up to 3 bars (LOCAL, HUB, CLOUD) per data type.
-     */
     private fun setupReportChart(report: List<OffloadLogRepository.ReportRow>) {
-        val chart = binding.reportChart
+        val chart = reportChart ?: return
         chart.description.isEnabled = false
         chart.legend.isEnabled = true
         chart.setTouchEnabled(true)
         chart.visibility = View.VISIBLE
 
-        // Distinct data types present in the report
         val dataTypes = report.map { it.dataType }.distinct().sorted()
         val nodeOrder = listOf("LOCAL", "HUB", "CLOUD")
         val nodeColors = mapOf(
@@ -582,7 +619,6 @@ class StatsFragment : Fragment() {
             "CLOUD" to Color.parseColor("#66BB6A")
         )
 
-        // Build lookup: (dataType, node) → avgMs
         val lookup = report.associate { (it.dataType to it.processingNode) to it.avgMs }
 
         val dataSets = mutableListOf<BarDataSet>()
@@ -592,7 +628,6 @@ class StatsFragment : Fragment() {
                 val avgMs = lookup[dt to node] ?: 0.0
                 entries.add(BarEntry(idx.toFloat(), avgMs.toFloat()))
             }
-            // Only add dataset if it has at least one non‑zero value
             if (entries.any { it.y > 0f }) {
                 val set = BarDataSet(entries, node).apply {
                     color = nodeColors[node] ?: Color.GRAY
@@ -648,6 +683,27 @@ class StatsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null
+        tvTasksDone = null
+        tvTotalData = null
+        tvAvgTime = null
+        tvSystemHealth = null
+        performanceChart = null
+        btnPingNode = null
+        btnRunBenchmark = null
+        btnRefreshReport = null
+        tvNodeStatus = null
+        tvNodeLatency = null
+        tvNodeStorage = null
+        tvNodeProcessor = null
+        statusDot = null
+        tvBenchmarkStatus = null
+        layoutBenchmarkResults = null
+        tvBenchLocalMs = null
+        tvBenchHubMs = null
+        benchmarkChart = null
+        tvBenchmarkWinner = null
+        tvReportSummary = null
+        reportChart = null
+        tvFastestMethod = null
     }
 }

@@ -5,48 +5,77 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#1A1A2E">
+    android:background="@color/bg_color">
 
-    <!-- ══ HEADER: "Edge Storage" + count + 🔍 + ↕ ══ -->
+    <!-- ══ HEADER: file count + search bar + sort ══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="20dp"
+        android:paddingStart="16dp"
         android:paddingEnd="8dp"
-        android:paddingTop="22dp"
+        android:paddingTop="16dp"
         android:paddingBottom="6dp">
 
-        <TextView
-            android:id="@+id/tvDownloadTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Edge Storage"
-            android:textSize="26sp"
-            android:fontFamily="sans-serif-medium"
-            android:textStyle="bold"
-            android:textColor="#2BC0A6"/>
-
+        <!-- File count -->
         <TextView
             android:id="@+id/tvFileCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0 files"
             android:textSize="13sp"
-            android:textColor="#666680"
-            android:layout_marginEnd="2dp"/>
+            android:textColor="@color/text_secondary"/>
 
-        <!-- Search icon button -->
-        <ImageButton
-            android:id="@+id/btnSearch"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_search"
-            app:tint="#2BC0A6"
-            android:contentDescription="Search"/>
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
+
+        <!-- Search bar inline (replaces empty space + separate search icon) -->
+        <LinearLayout
+            android:id="@+id/searchCard"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="4dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/search_bar_bg">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_search"
+                app:tint="@color/text_secondary"/>
+
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:hint="Search files..."
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:background="@android:color/transparent"
+                android:inputType="text"
+                android:singleLine="true"
+                android:layout_marginStart="6dp"/>
+
+            <ImageButton
+                android:id="@+id/btnCloseSearch"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_close"
+                app:tint="@color/text_secondary"
+                android:contentDescription="Clear Search"/>
+        </LinearLayout>
 
         <!-- Sort icon button -->
         <ImageButton
@@ -55,54 +84,9 @@
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_sort"
-            app:tint="#666680"
+            app:tint="@color/text_secondary"
             android:contentDescription="Sort"/>
 
-    </LinearLayout>
-
-    <!-- ══ SEARCH BAR (GONE by default, animates in on tap) ══ -->
-    <LinearLayout
-        android:id="@+id/searchCard"
-        android:layout_width="match_parent"
-        android:layout_height="46dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="4dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="4dp"
-        android:background="@drawable/search_bar_bg"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/ic_search"
-            app:tint="#666680"/>
-
-        <EditText
-            android:id="@+id/etSearch"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:hint="Search files..."
-            android:textSize="14sp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#666680"
-            android:background="@android:color/transparent"
-            android:inputType="text"
-            android:singleLine="true"
-            android:layout_marginStart="8dp"/>
-
-        <ImageButton
-            android:id="@+id/btnCloseSearch"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_close"
-            app:tint="#666680"
-            android:contentDescription="Close Search"/>
     </LinearLayout>
 
     <!-- ══ TOOLBAR: sort label (left) + delete (hidden) + grid/list toggle (right) ══ -->
@@ -114,12 +98,6 @@
         android:paddingStart="20dp"
         android:paddingEnd="10dp">
 
-        <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:src="@drawable/ic_sort"
-            app:tint="#666680"/>
-
         <TextView
             android:id="@+id/tvSortLabel"
             android:layout_width="0dp"
@@ -127,8 +105,7 @@
             android:layout_weight="1"
             android:text="Recent"
             android:textSize="13sp"
-            android:textColor="#666680"
-            android:layout_marginStart="6dp"
+            android:textColor="@color/text_secondary"
             android:clickable="true"
             android:focusable="true"/>
 
@@ -139,7 +116,7 @@
             android:layout_height="34dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_menu_delete"
-            app:tint="#E53935"
+            app:tint="@color/danger_color"
             android:contentDescription="Delete Selected"
             android:visibility="gone"
             android:layout_marginEnd="4dp"/>
@@ -151,7 +128,7 @@
             android:layout_height="34dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_grid_view"
-            app:tint="#2BC0A6"
+            app:tint="@color/primary_color"
             android:contentDescription="Toggle Grid/List"/>
 
     </LinearLayout>
@@ -182,7 +159,7 @@
             android:layout_width="72dp"
             android:layout_height="72dp"
             android:src="@drawable/ic_nav_download"
-            app:tint="#333348"
+            app:tint="@color/input_stroke_color"
             android:layout_marginBottom="18dp"/>
 
         <TextView
@@ -190,7 +167,7 @@
             android:layout_height="wrap_content"
             android:text="No processed files yet"
             android:textSize="17sp"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textStyle="bold"/>
 
         <TextView
@@ -198,7 +175,7 @@
             android:layout_height="wrap_content"
             android:text="Upload a file to the Edge Node to see results here"
             android:textSize="13sp"
-            android:textColor="#666680"
+            android:textColor="@color/text_secondary"
             android:gravity="center"
             android:paddingStart="32dp"
             android:paddingEnd="32dp"

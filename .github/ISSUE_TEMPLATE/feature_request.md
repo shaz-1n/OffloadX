@@ -1,10 +1,8 @@
 ---
 name: Feature request
 about: Suggest new offloading mode or new update maybe
-title: ''
-labels: ''
-assignees: ''
-
+title: '[FEATURE]'
+labels: 'enhancements'
 ---
 
 **Is your feature request related to a problem? Please describe.**

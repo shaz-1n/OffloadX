@@ -1,9 +1,8 @@
 ---
 name: Bug report
 about: Hardware crashse or ui glitches
-title: ''
-labels: ''
-assignees: ''
+title: 'bug'
+labels: 'bug'
 
 ---
 

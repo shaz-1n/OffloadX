@@ -363,7 +363,7 @@ Quick Tips
         scrollView.addView(tv)
 
         AlertDialog.Builder(requireContext())
-            .setTitle(" Help & Support")
+            .setTitle("Help & Support")
             .setView(scrollView)
             .setPositiveButton("Close", null)
             .setNeutralButton("Send Email") { _, _ ->

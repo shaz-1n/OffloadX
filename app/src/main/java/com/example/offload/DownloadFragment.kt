@@ -11,7 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -21,7 +20,6 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
 
     private val viewModel: SharedViewModel by activityViewModels()
     
-    private var isGridView = false
     private var sortByRecent = true
     private var adapter: FileAdapter? = null
     private var allFiles: List<FileModel> = emptyList()
@@ -34,12 +32,11 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
         val btnCloseSearch = view.findViewById<ImageButton>(R.id.btnCloseSearch)
         val btnSortHeader = view.findViewById<ImageButton>(R.id.btnSortHeader)
         val tvSortLabel = view.findViewById<TextView>(R.id.tvSortLabel)
-        val btnToggleView = view.findViewById<ImageButton>(R.id.btnToggleView)
         val btnDeleteSelected = view.findViewById<ImageButton>(R.id.btnDeleteSelected)
         val tvFileCount = view.findViewById<TextView>(R.id.tvFileCount)
         val emptyState = view.findViewById<LinearLayout>(R.id.emptyState)
 
-        // Setup initial layout
+        // Setup list layout (always list mode, no grid toggle)
         rvFiles.layoutManager = LinearLayoutManager(context)
 
         // Create adapter
@@ -87,22 +84,6 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
         btnSortHeader.setOnClickListener(sortAction)
         tvSortLabel.setOnClickListener(sortAction)
 
-        // ── Grid / List Toggle ──
-        btnToggleView.setOnClickListener {
-            isGridView = !isGridView
-            adapter?.isGridMode = isGridView
-            
-            if (isGridView) {
-                rvFiles.layoutManager = GridLayoutManager(context, 2)
-                btnToggleView.setImageResource(R.drawable.ic_list_view)
-            } else {
-                rvFiles.layoutManager = LinearLayoutManager(context)
-                btnToggleView.setImageResource(R.drawable.ic_grid_view)
-            }
-            adapter?.clearSelection()
-            applyFilters(etSearch.text?.toString() ?: "")
-        }
-
         // ── Delete Selected ──
         btnDeleteSelected.setOnClickListener {
             val selectedUrls = adapter?.getSelectedUrls() ?: emptySet()
@@ -119,6 +100,11 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        adapter?.cancelDownloads()
     }
 
     private fun applyFilters(query: String) {

@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
@@ -118,8 +119,6 @@ class StatsFragment : Fragment() {
         // Load report on first view
         loadReportFromDb()
 
-        // Auto-ping edge node
-        pingEdgeNode()
     }
 
     override fun onResume() {
@@ -235,7 +234,7 @@ class StatsFragment : Fragment() {
         benchmarkChart?.visibility = View.GONE
         tvBenchmarkWinner?.visibility = View.GONE
 
-        CoroutineScope(Dispatchers.Default).launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
             // --- PHASE 1: Local CPU benchmark ---
             val localStart = System.currentTimeMillis()
             runMatrixBenchmark()
@@ -553,7 +552,7 @@ class StatsFragment : Fragment() {
     // -------------------------------------------------------------------------
 
     private fun loadReportFromDb() {
-        CoroutineScope(Dispatchers.IO).launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             val report = logRepo.getPerformanceReport()
             val stats  = logRepo.getOverallStats()
 

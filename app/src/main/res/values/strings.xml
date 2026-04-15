@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Offload</string>
+    <string name="btn_download">Download</string>
+    <string name="btn_view_in_folder">View in folder</string>
 </resources>

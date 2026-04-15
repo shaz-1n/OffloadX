@@ -11,8 +11,8 @@
         <item name="colorSecondaryContainer">@color/md_theme_light_secondaryContainer</item>
         <item name="colorOnSecondaryContainer">@color/md_theme_light_onSecondaryContainer</item>
         <!-- Status bar + nav bar match the app background -->
-        <item name="android:statusBarColor">@color/bg_color</item>
-        <item name="android:navigationBarColor">@color/bg_color</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
     </style>
 
     <style name="CircleImage">

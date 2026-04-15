@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:background="@color/bg_color">
 
-    <!-- ══ HEADER: file count + search bar + sort ══ -->
+    <!-- ══ HEADER: search bar ══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -18,22 +18,7 @@
         android:paddingTop="16dp"
         android:paddingBottom="6dp">
 
-        <!-- File count -->
-        <TextView
-            android:id="@+id/tvFileCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0 files"
-            android:textSize="13sp"
-            android:textColor="@color/text_secondary"/>
-
-        <!-- Spacer -->
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1"/>
-
-        <!-- Search bar inline (replaces empty space + separate search icon) -->
+        <!-- Search bar -->
         <LinearLayout
             android:id="@+id/searchCard"
             android:layout_width="0dp"
@@ -43,15 +28,14 @@
             android:gravity="center_vertical"
             android:paddingStart="12dp"
             android:paddingEnd="4dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="6dp"
             android:background="@drawable/search_bar_bg">
 
             <ImageView
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:src="@drawable/ic_search"
-                app:tint="@color/text_secondary"/>
+                app:tint="@color/text_secondary"
+                android:importantForAccessibility="no"/>
 
             <EditText
                 android:id="@+id/etSearch"
@@ -64,7 +48,7 @@
                 android:textColorHint="@color/text_secondary"
                 android:background="@android:color/transparent"
                 android:inputType="text"
-                android:singleLine="true"
+                android:maxLines="1"
                 android:layout_marginStart="6dp"/>
 
             <ImageButton
@@ -89,7 +73,7 @@
 
     </LinearLayout>
 
-    <!-- ══ TOOLBAR: sort label (left) + delete (hidden) + grid/list toggle (right) ══ -->
+    <!-- ══ TOOLBAR: sort label (left) + delete selected (right, hidden) ══ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="36dp"
@@ -109,6 +93,16 @@
             android:clickable="true"
             android:focusable="true"/>
 
+        <!-- File count -->
+        <TextView
+            android:id="@+id/tvFileCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 files"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginEnd="8dp"/>
+
         <!-- Delete selected (hidden unless in selection mode) -->
         <ImageButton
             android:id="@+id/btnDeleteSelected"
@@ -120,16 +114,6 @@
             android:contentDescription="Delete Selected"
             android:visibility="gone"
             android:layout_marginEnd="4dp"/>
-
-        <!-- Grid / List Toggle -->
-        <ImageButton
-            android:id="@+id/btnToggleView"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_grid_view"
-            app:tint="@color/primary_color"
-            android:contentDescription="Toggle Grid/List"/>
 
     </LinearLayout>
 

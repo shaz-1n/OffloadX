@@ -3,19 +3,20 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="190dp"
+    android:layout_height="wrap_content"
     android:layout_margin="5dp"
     app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
-    app:strokeWidth="0dp"
-    app:cardBackgroundColor="#252540"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/input_stroke_color"
+    app:cardBackgroundColor="@color/card_color"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content">
 
         <!-- Selection checkbox -->
         <CheckBox
@@ -25,42 +26,27 @@
             android:layout_gravity="end|top"
             android:layout_margin="10dp"
             android:visibility="gone"
-            app:buttonTint="#2BC0A6"/>
+            app:buttonTint="@color/primary_color"/>
 
         <!-- Content -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="14dp">
 
-            <!-- Filename -->
+            <!-- Filename — 2 lines max, properly constrained -->
             <TextView
                 android:id="@+id/tvFileName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:maxLines="2"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textStyle="bold"
-                android:lineSpacingMultiplier="1.2"/>
-
-            <!-- File size -->
-            <TextView
-                android:id="@+id/tvFileSize"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textColor="#AAAACC"
-                android:layout_marginTop="5dp"/>
-
-            <!-- Spacer pushes icons to bottom -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"/>
+                android:lineSpacingMultiplier="1.15"/>
 
             <!-- Hidden tvFileDate (needed by adapter) -->
             <TextView
@@ -69,31 +55,70 @@
                 android:layout_height="wrap_content"
                 android:visibility="gone"/>
 
+            <!-- File size -->
+            <TextView
+                android:id="@+id/tvFileSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginTop="4dp"/>
+                
+            <!-- Task Type -->
+            <TextView
+                android:id="@+id/tvTaskType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/primary_color"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textStyle="bold"
+                android:layout_marginTop="2dp"/>
+
+            <!-- Description -->
+            <TextView
+                android:id="@+id/tvDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:layout_marginTop="1dp"/>
+
             <!-- Bottom action row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:layout_marginTop="10dp">
 
                 <ImageButton
                     android:id="@+id/btnDownload"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_nav_download"
-                    app:tint="#2BC0A6"
-                    android:contentDescription="Download"/>
+                    app:tint="@color/primary_color"
+                    android:contentDescription="@string/btn_download"/>
 
                 <ImageButton
                     android:id="@+id/btnView"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:layout_marginStart="6dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_eye"
-                    app:tint="#2BC0A6"
-                    android:contentDescription="View in folder"/>
+                    app:tint="@color/primary_color"
+                    android:contentDescription="@string/btn_view_in_folder"/>
             </LinearLayout>
 
         </LinearLayout>

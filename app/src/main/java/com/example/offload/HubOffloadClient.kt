@@ -165,13 +165,13 @@ class HubOffloadClient(private val context: Context) {
         } catch (e: java.net.SocketTimeoutException) {
             return@withContext OffloadResult(
                 false, null,
-                "Connection timed out. Check that the hub server is running and the IP is correct.",
+                "Hub timed out. Check server.",
                 executionTier = executionTier
             )
         } catch (e: java.net.ConnectException) {
             return@withContext OffloadResult(
                 false, null,
-                "Cannot connect to $ipAddress. Verify the IP address and that the server is running.",
+                "Cannot connect to $ipAddress.",
                 executionTier = executionTier
             )
         } catch (e: Exception) {

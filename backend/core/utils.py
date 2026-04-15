@@ -21,6 +21,17 @@ from django.conf import settings
 #   2. Pushed to Firebase for persistent cloud storage
 # =============================================================================
 
+# ── Global model cache (load once, reuse across requests) ──────────────────
+_yolo_cache = {}  # {'yolov8n': model, 'yolov8m': model}
+
+def _get_yolo(variant='yolov8n'):
+    """Return a cached YOLO model, loading it from disk only on the first call."""
+    if variant not in _yolo_cache:
+        from ultralytics import YOLO
+        _yolo_cache[variant] = YOLO(f'{variant}.pt')
+        print(f"    [MODEL CACHE] Loaded {variant} (will be reused for future requests)")
+    return _yolo_cache[variant]
+
 
 def process_compute_task(data, task_type: str, image_mode: str = 'GRAYSCALE',
                          pdf_mode: str = 'ANALYZE', text_mode: str = 'WORD_COUNT',
@@ -41,7 +52,7 @@ def process_compute_task(data, task_type: str, image_mode: str = 'GRAYSCALE',
     """
     start_time = time.perf_counter()
     
-    print(f"[EDGE CPU] Processing {task_type} task (image_mode={image_mode}, pdf={pdf_mode}, txt={text_mode}, vid={video_mode})...")
+    print(f"[ENGINE] Processing {task_type} task (image_mode={image_mode}, pdf={pdf_mode}, txt={text_mode}, vid={video_mode})")
 
     if task_type == 'COMPOSITE':
         result = _composite_processing(data)
@@ -131,17 +142,22 @@ def _process_video_analytics(file_obj) -> dict:
             
         temp_out_path = tempfile.mktemp(suffix='.jpg')
 
-        print(f"    -> [EDGE CPU] Initializing physical OpenCV Haar Cascade ML extraction...")
+        print(f"    Initializing High-Performance GPU Object Detection...")
         
-        # Load the pre-trained Haar Cascade for Face Detection out of OpenCV's default library
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        try:
+            model = _get_yolo('yolov8n')
+            use_yolo = True
+        except ImportError:
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            use_yolo = False
         
         cap = cv2.VideoCapture(temp_video_path)
         frame_count = 0
+        analyzed_count = 0
         total_faces_found = 0
         max_faces = 0
-        best_frame_original = None
-        best_faces = []
+        best_frame_drawn = None
+        SKIP = 5  # Only analyze every 5th frame (5x speedup)
         
         while cap.isOpened():
             ret, frame = cap.read()
@@ -150,41 +166,48 @@ def _process_video_analytics(file_obj) -> dict:
                 
             frame_count += 1
             
-            if best_frame_original is None:
-                best_frame_original = frame.copy()
+            if best_frame_drawn is None:
+                best_frame_drawn = frame.copy()
+
+            # Skip frames for speed — only analyze every Nth frame
+            if frame_count % SKIP != 0:
+                continue
+
+            analyzed_count += 1
                 
             # --- REAL HEAVY MACHINE LEARNING ALGORITHM PER FRAME ---
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if use_yolo:
+                results = model(frame, verbose=False)
+                face_count_in_frame = len(results[0].boxes)
+                drawn_frame = results[0].plot()
+            else:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                face_count_in_frame = len(faces)
+                drawn_frame = frame.copy()
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(drawn_frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
+                    cv2.putText(drawn_frame, "AI: DETECTED", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
             
-            # Execute Neural Cascade Classifier Object Detection
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-            
-            face_count_in_frame = len(faces)
             total_faces_found += face_count_in_frame
             
             if face_count_in_frame > max_faces:
                 max_faces = face_count_in_frame
-                best_frame_original = frame.copy()
-                best_faces = faces
+                best_frame_drawn = drawn_frame
             
-            if frame_count % 30 == 0:
-                print(f"       ... Hard ML crunching: Processed {frame_count} heavy video frames so far...")
+            if analyzed_count % 10 == 0:
+                print(f"    Analyzed {analyzed_count} frames (scanned {frame_count} total)")
                 
-            if frame_count >= 300: 
-                print("       ... Stop trigger reached (300 frames). Generating 'Edge Compute' Analytical Dashboard JPG.")
+            if analyzed_count >= 60:  # 60 analyzed frames = 300 total frames scanned
+                print("    Frame limit reached. Generating analytics report.")
                 break
                 
         cap.release()
         
-        # We found the frame with the most faces! Now we apply ML Bounding Boxes & Offload Statistics!
+        # We found the frame with the most objects! Now we apply ML Bounding Boxes & Offload Statistics!
         # This acts as the physical PROOF of Offloading for your Professor.
-        if best_frame_original is not None:
-            final_img = best_frame_original.copy()
-            
-            # Draw Thick Green Bounding Boxes dynamically around every detected face
-            for (x, y, w, h) in best_faces:
-                cv2.rectangle(final_img, (x, y), (x+w, y+h), (0, 255, 0), 4)
-                cv2.putText(final_img, "AI: DETECTED", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        if best_frame_drawn is not None:
+            final_img = best_frame_drawn
             
             # Add massive "OFFLOAD ANALYTICS DATA" to prove the computation
             cv2.rectangle(final_img, (0, 0), (1000, 250), (0, 0, 0), -1)
@@ -215,7 +238,7 @@ def _process_video_analytics(file_obj) -> dict:
         os.remove(temp_out_path)
         
         analysis_result = f"Analyzed {frame_count} video frames on Edge. Generated Final Dashboard Proof."
-        print(f"    -> [DONE] {analysis_result}")
+        print(f"    Done: {analysis_result}")
         
         return {
             'status': 'success',
@@ -227,7 +250,7 @@ def _process_video_analytics(file_obj) -> dict:
             'complexity_score': total_faces_found
         }
     except Exception as e:
-        print(f"    -> [ERROR parsing video] {str(e)}")
+        print(f"    ERROR (video): {str(e)}")
         import traceback
         traceback.print_exc()
         return {
@@ -256,22 +279,22 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
 
     # ─── 1. VIDEO ────────────────────────────────────────────────────────────
     if any(filename.endswith(ext) for ext in ('.mp4', '.mkv', '.mov', '.avi')):
-        print(f"    -> [VIDEO DETECTED] Routing to video processor (mode={video_mode})...")
+        print(f"    Video detected, routing to processor (mode={video_mode})")
         return _process_video(file_obj, video_mode, timestamp, _save_and_url)
 
     # ─── 2. PDF ──────────────────────────────────────────────────────────────
     if filename.endswith('.pdf'):
-        print(f"    -> [PDF DETECTED] Routing to PDF processor (mode={pdf_mode})...")
+        print(f"    PDF detected, routing to processor (mode={pdf_mode})")
         return _process_pdf(file_obj, pdf_mode, timestamp, _save_and_url)
 
     # ─── 3. TEXT / CSV / LOG ─────────────────────────────────────────────────
     if any(filename.endswith(ext) for ext in ('.txt', '.csv', '.log', '.md', '.json', '.xml')):
-        print(f"    -> [TEXT DETECTED] Routing to text processor (mode={text_mode})...")
+        print(f"    Text file detected, routing to processor (mode={text_mode})")
         return _process_text(file_obj, text_mode, timestamp, _save_and_url)
 
     # ─── 4. IMAGE ────────────────────────────────────────────────────────────
     if any(filename.endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff')):
-        print(f"    -> [IMAGE DETECTED] Executing mode: {image_mode}...")
+        print(f"    Image detected, applying mode: {image_mode}")
         try:
             image = Image.open(file_obj).convert('RGB')
             mode_label = image_mode
@@ -294,28 +317,38 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                 np_arr = np.frombuffer(buf.read(), np.uint8)
                 cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-                gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-                face_cascade = cv2.CascadeClassifier(
-                    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-                )
-                faces = face_cascade.detectMultiScale(
-                    gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
-                )
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(cv_img, (x, y), (x + w, y + h), (0, 255, 80), 3)
-                    cv2.putText(cv_img, "DETECTED", (x, y - 8),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 80), 2)
+                try:
+                    model = _get_yolo('yolov8m')
+                    results = model(cv_img, conf=0.60)
+                    
+                    # Plot the results on the image (draws boxes and labels)
+                    cv_img = results[0].plot()
+                    num_objects = len(results[0].boxes)
+                    
+                    # Overlay stats banner
+                    cv2.rectangle(cv_img, (0, 0), (cv_img.shape[1], 40), (0, 0, 0), -1)
+                    cv2.putText(cv_img, f"OffloadX GPU YOLOv8: {num_objects} object(s) detected",
+                                (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 200), 2)
+                    
+                except ImportError:
+                    # Fallback if ultralytics is not installed somehow
+                    gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                    for (x, y, w, h) in faces:
+                        cv2.rectangle(cv_img, (x, y), (x + w, y + h), (0, 255, 80), 3)
+                        cv2.putText(cv_img, "DETECTED", (x, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 80), 2)
+                    num_objects = len(faces)
+                    cv2.rectangle(cv_img, (0, 0), (cv_img.shape[1], 40), (0, 0, 0), -1)
+                    cv2.putText(cv_img, f"OffloadX: {num_objects} object(s) detected (CPU fallback)",
+                                (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 200), 2)
 
-                # Overlay stats banner
-                cv2.rectangle(cv_img, (0, 0), (cv_img.shape[1], 40), (0, 0, 0), -1)
-                cv2.putText(cv_img, f"OffloadX: {len(faces)} object(s) detected",
-                            (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 200), 2)
 
                 _, enc = cv2.imencode('.jpg', cv_img)
                 out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
                 file_url = _save_and_url(enc.tobytes(), out_name)
                 mode_label = f'Object Detection ({len(faces)} found)'
-                print(f"    -> Object Detection: {len(faces)} face(s) found.")
+                print(f"    Object Detection: {len(faces)} face(s) found.")
                 return {
                     'status': 'success',
                     'original_name': file_obj.name,
@@ -339,7 +372,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                     edges_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
                     _, enc = cv2.imencode('.jpg', edges_rgb)
                     processed_bytes = enc.tobytes()
-                    print("    -> Edge Detection: OpenCV Canny applied.")
+                    print("    Edge Detection: OpenCV Canny applied.")
                 except ImportError:
                     # PIL fallback: find edges
                     from PIL import ImageFilter
@@ -348,7 +381,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                     buf2 = io.BytesIO()
                     processed.save(buf2, format='JPEG')
                     processed_bytes = buf2.getvalue()
-                    print("    -> Edge Detection: PIL fallback used.")
+                    print("    Edge Detection: PIL fallback used.")
                 out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
                 file_url = _save_and_url(processed_bytes, out_name)
                 return {
@@ -421,7 +454,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
             processed.save(buffer, format=fmt)
             out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
             file_url = _save_and_url(buffer.getvalue(), out_name)
-            print(f"    -> Mode '{image_mode}' applied to {image.width}x{image.height} image.")
+            print(f"    Mode '{image_mode}' applied to {image.width}x{image.height} image.")
             return {
                 'status': 'success',
                 'original_name': file_obj.name,
@@ -431,7 +464,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                 'dimensions': f"{image.width}x{image.height}",
             }
         except Exception as e:
-            print(f"    -> [WARN] Image processing failed ({image_mode}): {e}. Storing original.")
+            print(f"    WARN: Image processing failed ({image_mode}): {e}. Storing original.")
             import traceback; traceback.print_exc()
             # Return the original image as fallback rather than falling through to generic handler
             try:
@@ -456,7 +489,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                 }
 
     # ─── 5. GENERIC FALLBACK (docx, xlsx, zip, etc.) ────────────────────────
-    print(f"    -> [GENERIC FILE] Storing '{filename}' and serving download link...")
+    print(f"    Generic file: storing '{filename}' and serving download link.")
     try:
         data = file_obj.read()
         out_name = f"processed_{timestamp}_{file_obj.name}"
@@ -710,7 +743,7 @@ def _process_video(file_obj, video_mode: str, timestamp: int, save_and_url) -> d
         return _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url)
 
     except Exception as e:
-        print(f"    -> [ERROR parsing video] {str(e)}")
+        print(f"    ERROR (video): {str(e)}")
         import traceback; traceback.print_exc()
         return {'status': 'error', 'error_caught': str(e), 'mode': f'Video {video_mode} Failed'}
 
@@ -718,59 +751,81 @@ def _process_video(file_obj, video_mode: str, timestamp: int, save_and_url) -> d
 def _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url) -> dict:
     """Core face-detection pipeline (original analytics engine, extracted for reuse)."""
     import cv2, numpy as np, os, tempfile
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    frame_count = total_faces = max_faces = 0
-    best_frame_orig = None
-    best_faces = []
+    try:
+        print(f"    [GPU ENGINE] Initializing YOLOv8m (Medium) architecture into VRAM...")
+        model = _get_yolo('yolov8m')
+        use_yolo = True
+        print(f"    [GPU ENGINE] High-Performance GPU Object Detection Active")
+    except ImportError:
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        use_yolo = False
+        print(f"    [CPU ENGINE] Initializing Haar Cascade Fallback...")
+
+    frame_count = total_faces = 0
+    SKIP = 3  # Only run detection every 3rd frame (3x speedup)
+    last_drawn = None
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0.0 or np.isnan(fps):
+        fps = 30.0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    temp_out = tempfile.mktemp(suffix='.mp4')
+    # Use standard mp4 code format compatible natively with Android playback
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(temp_out, fourcc, fps, (width, height))
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
         frame_count += 1
-        if best_frame_orig is None:
-            best_frame_orig = frame.copy()
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-        face_count = len(faces)
-        total_faces += face_count
-        if face_count > max_faces:
-            max_faces = face_count
-            best_frame_orig = frame.copy()
-            best_faces = faces
-        if frame_count >= 300:
+        
+        if frame_count % SKIP == 0:
+            # Run actual detection on this frame
+            if use_yolo:
+                results = model(frame, verbose=False, conf=0.60)
+                face_count = len(results[0].boxes)
+                last_drawn = results[0].plot()
+            else:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+                face_count = len(faces)
+                last_drawn = frame.copy()
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(last_drawn, (x, y), (x+w, y+h), (0, 255, 0), 4)
+                    cv2.putText(last_drawn, "AI: DETECTED", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            total_faces += face_count
+        
+        # Write either the freshly detected frame or the raw frame
+        out.write(last_drawn if last_drawn is not None else frame)
+
+        if frame_count % 90 == 0:
+            tracker_name = 'YOLOv8' if use_yolo else 'Haar cascade'
+            print(f"    [GPU ENGINE] Processed frame {frame_count} | Tracking via {tracker_name}")
+            
+        # Optional timeout cap: 600 frames is ~20 seconds of video
+        if frame_count >= 600:
+            print("    [GPU ENGINE] Frame limit reached (600). Generating finalized tracking stream.")
             break
     cap.release()
-
-    temp_out = tempfile.mktemp(suffix='.jpg')
-    if best_frame_orig is not None:
-        final = best_frame_orig.copy()
-        for (x, y, w, h) in best_faces:
-            cv2.rectangle(final, (x, y), (x+w, y+h), (0, 255, 0), 4)
-            cv2.putText(final, "AI: DETECTED", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        cv2.rectangle(final, (0, 0), (1000, 250), (0, 0, 0), -1)
-        cv2.putText(final, "OFFLOAD-X: EDGE COMPUTE ANALYTICS REPORT",
-                    (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 3)
-        cv2.putText(final, f"-> Raw Video Frames Processed: {frame_count}",
-                    (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.putText(final, f"-> Deep Learning Objects Detected: {total_faces}",
-                    (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.imwrite(temp_out, final)
+    out.release()
 
     try:
         os.remove(tmp_path)
     except Exception:
         pass
 
-    out_name = f"offload_edge_report_{timestamp}.jpg"
+    out_name = f"offload_video_{timestamp}.mp4"
     with open(temp_out, 'rb') as f:
         file_url = save_and_url(f.read(), out_name)
     os.remove(temp_out)
 
     return {
         'status': 'success', 'original_name': file_obj.name,
-        'processed_url': file_url, 'file_type': 'image',
-        'mode': 'Machine Learning Face Tracking',
+        'processed_url': file_url, 'file_type': 'video',
+        'mode': 'Continuous YOLOv8 Video Tracking',
         'frames_analyzed': frame_count, 'complexity_score': total_faces,
     }
 

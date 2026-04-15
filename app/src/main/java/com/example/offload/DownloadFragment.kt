@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.view.animation.AnimationUtils
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -12,7 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -22,9 +20,7 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
 
     private val viewModel: SharedViewModel by activityViewModels()
     
-    private var isGridView = false
     private var sortByRecent = true
-    private var isSearchVisible = false
     private var adapter: FileAdapter? = null
     private var allFiles: List<FileModel> = emptyList()
 
@@ -33,17 +29,14 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
 
         val rvFiles = view.findViewById<RecyclerView>(R.id.rvDownloadList)
         val etSearch = view.findViewById<EditText>(R.id.etSearch)
-        val searchCard = view.findViewById<LinearLayout>(R.id.searchCard)
-        val btnSearch = view.findViewById<ImageButton>(R.id.btnSearch)
         val btnCloseSearch = view.findViewById<ImageButton>(R.id.btnCloseSearch)
         val btnSortHeader = view.findViewById<ImageButton>(R.id.btnSortHeader)
         val tvSortLabel = view.findViewById<TextView>(R.id.tvSortLabel)
-        val btnToggleView = view.findViewById<ImageButton>(R.id.btnToggleView)
         val btnDeleteSelected = view.findViewById<ImageButton>(R.id.btnDeleteSelected)
         val tvFileCount = view.findViewById<TextView>(R.id.tvFileCount)
         val emptyState = view.findViewById<LinearLayout>(R.id.emptyState)
 
-        // Setup initial layout
+        // Setup list layout (always list mode, no grid toggle)
         rvFiles.layoutManager = LinearLayoutManager(context)
 
         // Create adapter
@@ -68,25 +61,9 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
             rvFiles.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
         }
 
-        // ── Search Icon: Toggle search bar visibility ──
-        btnSearch.setOnClickListener {
-            if (!isSearchVisible) {
-                searchCard.visibility = View.VISIBLE
-                searchCard.alpha = 0f
-                searchCard.animate().alpha(1f).setDuration(200).start()
-                etSearch.requestFocus()
-                // Show keyboard
-                val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                isSearchVisible = true
-            } else {
-                closeSearch(searchCard, etSearch)
-            }
-        }
-
-        // Close search button (X inside search bar)
+        // Close/clear search button (X inside search bar)
         btnCloseSearch.setOnClickListener {
-            closeSearch(searchCard, etSearch)
+            etSearch.text.clear()
         }
 
         // Search text filter
@@ -107,22 +84,6 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
         btnSortHeader.setOnClickListener(sortAction)
         tvSortLabel.setOnClickListener(sortAction)
 
-        // ── Grid / List Toggle ──
-        btnToggleView.setOnClickListener {
-            isGridView = !isGridView
-            adapter?.isGridMode = isGridView
-            
-            if (isGridView) {
-                rvFiles.layoutManager = GridLayoutManager(context, 2)
-                btnToggleView.setImageResource(R.drawable.ic_list_view)
-            } else {
-                rvFiles.layoutManager = LinearLayoutManager(context)
-                btnToggleView.setImageResource(R.drawable.ic_grid_view)
-            }
-            adapter?.clearSelection()
-            applyFilters(etSearch.text?.toString() ?: "")
-        }
-
         // ── Delete Selected ──
         btnDeleteSelected.setOnClickListener {
             val selectedUrls = adapter?.getSelectedUrls() ?: emptySet()
@@ -141,16 +102,9 @@ class DownloadFragment : Fragment(R.layout.fragment_download) {
         }
     }
 
-    private fun closeSearch(searchCard: LinearLayout, etSearch: EditText) {
-        searchCard.animate().alpha(0f).setDuration(150).withEndAction {
-            searchCard.visibility = View.GONE
-        }.start()
-        etSearch.text.clear()
-        // Hide keyboard
-        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.hideSoftInputFromWindow(etSearch.windowToken, 0)
-        isSearchVisible = false
-        applyFilters("")
+    override fun onDestroyView() {
+        super.onDestroyView()
+        adapter?.cancelDownloads()
     }
 
     private fun applyFilters(query: String) {

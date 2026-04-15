@@ -188,7 +188,7 @@ class CloudFileComputeView(APIView):
         text_mode  = serializer.validated_data.get('text_mode',  'WORD_COUNT')
         video_mode = serializer.validated_data.get('video_mode', 'FACE_DETECTION')
 
-        print(f"[CLOUD]  [CLOUD TIER] Incoming file offload from {device_id} | {round(file_obj.size / 1048576, 2)} MB")
+        print(f"[CLOUD] Incoming file offload from {device_id} | {round(file_obj.size / 1048576, 2)} MB")
 
         task = ComputeTask.objects.create(
             device_id=device_id,
@@ -211,7 +211,7 @@ class CloudFileComputeView(APIView):
             task.processing_time_ms = elapsed_ms
             task.save()
 
-            print(f"[CLOUD]  [CLOUD TIER] Done in {elapsed_ms}ms")
+            print(f"[CLOUD] Completed in {elapsed_ms}ms")
 
             return Response({
                 'task_id': str(task.id),
@@ -306,13 +306,13 @@ class FileComputeView(APIView):
         video_mode = serializer.validated_data.get('video_mode', 'FACE_DETECTION')
 
         print("\n" + "="*70)
-        print(f"[HUB] [OFFLOAD-X EDGE NODE] INCOMING OFFLOAD OVER WIFI DETECTED!")
+        print(f"[HUB] Incoming file upload from {device_id}")
         print("="*70)
-        print(f" Source Device : {device_id}")
-        print(f"[PKG] Payload Size  : {round(file_obj.size / 1048576, 2)} MB")
-        print(f"[FILE] File Name     : {file_obj.name}")
-        print(f"[TASK] Task Type     : {task_type} (Dynamic Heavy Compute)")
-        print(f"[MODE] img={image_mode} | pdf={pdf_mode} | txt={text_mode} | vid={video_mode}")
+        print(f"  Device     : {device_id}")
+        print(f"  Size       : {round(file_obj.size / 1048576, 2)} MB")
+        print(f"  File       : {file_obj.name}")
+        print(f"  Task       : {task_type}")
+        print(f"  Modes      : img={image_mode} | pdf={pdf_mode} | txt={text_mode} | vid={video_mode}")
         print("-" * 70)
 
         # Create Task Record
@@ -342,8 +342,8 @@ class FileComputeView(APIView):
             task.processing_time_ms = compute_result.get('processing_time_ms', 0)
             task.save()
             
-            print(f"[OK] [SUCCESS] Edge Node Computation finished in {task.processing_time_ms} ms")
-            print(f" Transmitting Computed Result back to Android Device...")
+            print(f"[HUB] Completed in {task.processing_time_ms} ms")
+            print(f"  Sending result back to device...")
             print("="*70 + "\n")
 
             return Response({
@@ -358,7 +358,7 @@ class FileComputeView(APIView):
             task.error_message = str(e)
             task.save()
             
-            print(f"[ERR] [FAILED] Computation Error: {str(e)}")
+            print(f"[HUB] FAILED: {str(e)}")
             print("="*70 + "\n")
             
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

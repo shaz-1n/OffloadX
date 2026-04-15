@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#111125">
+    android:background="@color/bg_color">
 
     <!-- Fragment container -->
     <androidx.fragment.app.FragmentContainerView
@@ -22,7 +22,7 @@
         android:id="@+id/nav_divider"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1E1E32"
+        android:background="@color/input_stroke_color"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"/>
 
     <!-- Bottom Navigation — styled from screen a2de288bf7ac4acab350888071619100 -->
@@ -30,7 +30,7 @@
         android:id="@+id/bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="68dp"
-        android:background="#111125"
+        android:background="@color/bg_color"
         android:elevation="0dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"

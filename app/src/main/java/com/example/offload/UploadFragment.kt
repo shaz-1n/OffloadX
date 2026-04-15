@@ -47,8 +47,7 @@ class UploadFragment : Fragment() {
     private var isAutoRouting: Boolean = true
 
     // View references (using findViewById instead of ViewBinding to avoid stale binding class crashes)
-    private var etTaskId: TextInputEditText? = null
-    private var etProcessId: TextInputEditText? = null
+
     private var etHubIp: TextInputEditText? = null
     private var etTaskTitle: TextInputEditText? = null
     private var tvFileStatus: TextView? = null
@@ -71,6 +70,9 @@ class UploadFragment : Fragment() {
     if (uri != null) {
     selectedUri = uri
     analyzeFile(uri)
+    // Enable the upload button now that a file is selected
+    btnFinalUpload?.isEnabled = true
+    btnFinalUpload?.alpha = 1.0f
     }
     }
 
@@ -88,8 +90,7 @@ class UploadFragment : Fragment() {
     logRepo = OffloadLogRepository(requireContext())
 
     // Find all views manually — avoids any generated binding class issues
-    etTaskId = view.findViewById(R.id.etTaskId)
-    etProcessId = view.findViewById(R.id.etProcessId)
+
     etHubIp = view.findViewById(R.id.etHubIp)
     etTaskTitle = view.findViewById(R.id.etTaskTitle)
     tvFileStatus = view.findViewById(R.id.tvFileStatus)
@@ -105,12 +106,14 @@ class UploadFragment : Fragment() {
     btnSearchFile = view.findViewById(R.id.btnSearchFile)
     btnFinalUpload = view.findViewById(R.id.btnFinalUpload)
 
+    // Disable upload button initially — requires a file to be selected first
+    btnFinalUpload?.isEnabled = false
+    btnFinalUpload?.alpha = 0.4f
+
     val prefs = requireActivity().getSharedPreferences("OffloadXPrefs", Context.MODE_PRIVATE)
     etHubIp?.setText(prefs.getString("hub_ip", "192.168.1.100:8000"))
 
-    // Automatically generate a Task ID when the screen opens
-    etTaskId?.setText("TASK_${System.currentTimeMillis() / 1000}")
-    etProcessId?.setText("PROC_${java.util.UUID.randomUUID().toString().take(8)}")
+
 
     // --- DIRECT REDIRECTION: Listen for shared files from outside the app ---
     viewModel.sharedUri.observe(viewLifecycleOwner) { uri ->
@@ -119,6 +122,8 @@ class UploadFragment : Fragment() {
     selectedUri = uri
     tvFileStatus?.text = "Mode: Direct Redirection (Shared File)"
     analyzeFile(uri)
+    btnFinalUpload?.isEnabled = true
+    btnFinalUpload?.alpha = 1.0f
     viewModel.setSharedUri(null)
     }
     }
@@ -170,7 +175,7 @@ class UploadFragment : Fragment() {
     // ── Upload Button ──────────────────────────────────────────────────────
     btnFinalUpload?.setOnClickListener {
     if (selectedUri == null) {
-    Toast.makeText(context, "Please select a file first", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "Select a file first", Toast.LENGTH_SHORT).show()
     return@setOnClickListener
     }
 
@@ -188,12 +193,13 @@ class UploadFragment : Fragment() {
 
     // Validate manual routing selection
     if (!isAutoRouting && cbLocal?.isChecked != true && cbCloud?.isChecked != true) {
-    Toast.makeText(context, "Please select Local or Hub/Cloud in Manual mode", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, "Pick Local or Hub/Cloud", Toast.LENGTH_SHORT).show()
     return@setOnClickListener
     }
 
     val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
-    dispatchProcessingDialog(mimeType, title, ipAddress)
+    val taskDesc = view?.findViewById<TextInputEditText>(R.id.etTaskDesc)?.text?.toString() ?: ""
+    dispatchProcessingDialog(mimeType, title, ipAddress, taskDesc)
     }
     }
 
@@ -255,26 +261,26 @@ class UploadFragment : Fragment() {
     * Detects the file type from MIME type and shows the appropriate
     * processing-mode dialog (or goes directly for unknown types).
     */
-    private fun dispatchProcessingDialog(mimeType: String, title: String, ipAddress: String) {
+    private fun dispatchProcessingDialog(mimeType: String, title: String, ipAddress: String, taskDesc: String) {
     when {
     mimeType.contains("image") -> showImageModeDialog { mode ->
     selectedImageMode = mode
-    startUpload(title, ipAddress)
+    startUpload(title, ipAddress, taskDesc)
     }
     mimeType.contains("video") -> showVideoModeDialog { mode ->
     selectedVideoMode = mode
-    startUpload(title, ipAddress)
+    startUpload(title, ipAddress, taskDesc)
     }
     mimeType.contains("pdf") -> showPdfModeDialog { mode ->
     selectedPdfMode = mode
-    startUpload(title, ipAddress)
+    startUpload(title, ipAddress, taskDesc)
     }
     mimeType.contains("text") || mimeType.contains("json") ||
     mimeType.contains("csv") || mimeType.contains("xml") -> showTextModeDialog { mode ->
     selectedTextMode = mode
-    startUpload(title, ipAddress)
+    startUpload(title, ipAddress, taskDesc)
     }
-    else -> startUpload(title, ipAddress) // docx, xlsx, zip, etc.
+    else -> startUpload(title, ipAddress, taskDesc) // docx, xlsx, zip, etc.
     }
     }
 
@@ -368,26 +374,28 @@ class UploadFragment : Fragment() {
     * Determines the execution route (based on Auto/Manual selection and
     * decision engine), then performs the upload or local processing.
     */
-    private fun startUpload(title: String, ipAddress: String) {
+    private fun startUpload(title: String, ipAddress: String, taskDesc: String = "") {
     requireActivity().getSharedPreferences("OffloadXPrefs", Context.MODE_PRIVATE)
     .edit().putString("hub_ip", ipAddress).apply()
 
     val battery = getBatteryPercentage()
     val netType = getNetworkType()
-    val mimeType = requireContext().contentResolver.getType(selectedUri!!) ?: ""
+    val ctx = requireContext()
+    val mimeType = ctx.contentResolver.getType(selectedUri!!) ?: ""
     // Combine all chosen modes into a single extra param map
     val chosenMode = resolveFileProcessingMode(mimeType)
 
     val fileToUpload = selectedUri!!
 
     btnFinalUpload?.isEnabled = false
-    btnFinalUpload?.text = "Processing..."
+    btnFinalUpload?.alpha = 0.4f
+    btnFinalUpload?.text = "Processing..."  // overrides "Upload Task"
 
     lifecycleScope.launch(Dispatchers.Default) {
     val start = System.currentTimeMillis()
     val taskStartMs = start
 
-    // ── Determine execution route ──────────────────────────────────────
+    // ── Quick connectivity pre-check for Hub/Cloud routes ──────────────
     val decision: ExecutionRoute = if (isAutoRouting) {
     // Decision engine decides automatically
     val engine = DecisionEngine()
@@ -409,8 +417,33 @@ class UploadFragment : Fragment() {
     var finalProcessedUrl = ""
 
     if (decision == ExecutionRoute.HUB || decision == ExecutionRoute.CLOUD) {
-    val client = HubOffloadClient(requireContext())
-    val tier = if (decision == ExecutionRoute.CLOUD) "CLOUD"else "HUB"
+    // Fast reachability check — fail in ~2s instead of 60s timeout
+    val baseUrl = if (ipAddress.startsWith("http")) ipAddress else "http://$ipAddress"
+    val reachable = withContext(Dispatchers.IO) {
+        var probe: java.net.HttpURLConnection? = null
+        try {
+            probe = java.net.URL("$baseUrl/api/health/").openConnection() as java.net.HttpURLConnection
+            probe.connectTimeout = 2000
+            probe.readTimeout = 2000
+            probe.requestMethod = "GET"
+            probe.responseCode in 200..299
+        } catch (_: Exception) { false }
+        finally { probe?.disconnect() }
+    }
+
+    if (!reachable) {
+        withContext(Dispatchers.Main) {
+            if (!isAdded) return@withContext
+            btnFinalUpload?.isEnabled = true
+            btnFinalUpload?.alpha = 1.0f
+            btnFinalUpload?.text = "⬆  Upload Task"
+            Toast.makeText(context, "Hub unreachable at $ipAddress", Toast.LENGTH_LONG).show()
+        }
+        return@launch
+    }
+
+    val client = HubOffloadClient(ctx)
+    val tier = if (decision == ExecutionRoute.CLOUD) "CLOUD" else "HUB"
     val offloadResponse = client.offloadToHub(
     ipAddress, "android_device_1", "IMAGE_GRAYSCALE", fileToUpload, tier,
     imageMode = selectedImageMode,
@@ -423,11 +456,11 @@ class UploadFragment : Fragment() {
     hubComputeTimeMs = offloadResponse.serverProcessingTimeMs
 
     if (offloadResponse.success) {
-    val tierLabel = if (tier == "CLOUD") "Cloud"else "Hub"
+    val tierLabel = if (tier == "CLOUD") "Cloud" else "Hub"
     executionStatusMsg = "[$tierLabel OK] Round-trip: ${routeDuration}ms | Server compute: ${hubComputeTimeMs}ms"
     finalProcessedUrl = offloadResponse.resultMsg ?: ""
     } else {
-    val tierLabel = if (tier == "CLOUD") "Cloud"else "Hub"
+    val tierLabel = if (tier == "CLOUD") "Cloud" else "Hub"
     executionStatusMsg = "[$tierLabel FAIL] ${offloadResponse.errorMessage}"
     }
     } else {
@@ -445,7 +478,8 @@ class UploadFragment : Fragment() {
     if (!isAdded) return@withContext // fragment gone
 
     btnFinalUpload?.isEnabled = true
-    btnFinalUpload?.text = "Start Upload Process"
+    btnFinalUpload?.alpha = 1.0f
+    btnFinalUpload?.text = "⬆  Upload Task"
 
     val logStr = "Mode: $selectedMode | Route: $decision | "+
     "Size: ${"%.2f".format(actualFileSizeMB)}MB | Processing: $chosenMode\n$executionStatusMsg"
@@ -486,6 +520,7 @@ class UploadFragment : Fragment() {
     fileDate = today,
     fileType = prettyFileType,
     processedUrl = finalProcessedUrl,
+    description = taskDesc.ifEmpty { "$chosenMode processing" },
     processingTimeMs = recordedMs,
     dataSizeMB = actualFileSizeMB,
     taskType = selectedMode,
@@ -501,7 +536,7 @@ class UploadFragment : Fragment() {
     "DIRECT REDIRECTION"-> "SIMPLE"
     else -> "COMPOSITE"
     }
-    val dbStatus = if (executionStatusMsg.contains("")) "FAILURE"else "SUCCESS"
+    val dbStatus = if (executionStatusMsg.contains("FAIL")) "FAILURE" else "SUCCESS"
     kotlinx.coroutines.withContext(Dispatchers.IO) {
     logRepo.insertLog(
     taskName = title,
@@ -592,8 +627,7 @@ class UploadFragment : Fragment() {
     override fun onDestroyView() {
     super.onDestroyView()
     // Clear all view references
-    etTaskId = null
-    etProcessId = null
+
     etHubIp = null
     etTaskTitle = null
     tvFileStatus = null

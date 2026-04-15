@@ -21,6 +21,17 @@ from django.conf import settings
 #   2. Pushed to Firebase for persistent cloud storage
 # =============================================================================
 
+# ── Global model cache (load once, reuse across requests) ──────────────────
+_yolo_cache = {}  # {'yolov8n': model, 'yolov8m': model}
+
+def _get_yolo(variant='yolov8n'):
+    """Return a cached YOLO model, loading it from disk only on the first call."""
+    if variant not in _yolo_cache:
+        from ultralytics import YOLO
+        _yolo_cache[variant] = YOLO(f'{variant}.pt')
+        print(f"    [MODEL CACHE] Loaded {variant} (will be reused for future requests)")
+    return _yolo_cache[variant]
+
 
 def process_compute_task(data, task_type: str, image_mode: str = 'GRAYSCALE',
                          pdf_mode: str = 'ANALYZE', text_mode: str = 'WORD_COUNT',
@@ -134,8 +145,7 @@ def _process_video_analytics(file_obj) -> dict:
         print(f"    Initializing High-Performance GPU Object Detection...")
         
         try:
-            from ultralytics import YOLO
-            model = YOLO('yolov8n.pt')
+            model = _get_yolo('yolov8n')
             use_yolo = True
         except ImportError:
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -143,9 +153,11 @@ def _process_video_analytics(file_obj) -> dict:
         
         cap = cv2.VideoCapture(temp_video_path)
         frame_count = 0
+        analyzed_count = 0
         total_faces_found = 0
         max_faces = 0
         best_frame_drawn = None
+        SKIP = 5  # Only analyze every 5th frame (5x speedup)
         
         while cap.isOpened():
             ret, frame = cap.read()
@@ -156,6 +168,12 @@ def _process_video_analytics(file_obj) -> dict:
             
             if best_frame_drawn is None:
                 best_frame_drawn = frame.copy()
+
+            # Skip frames for speed — only analyze every Nth frame
+            if frame_count % SKIP != 0:
+                continue
+
+            analyzed_count += 1
                 
             # --- REAL HEAVY MACHINE LEARNING ALGORITHM PER FRAME ---
             if use_yolo:
@@ -177,11 +195,11 @@ def _process_video_analytics(file_obj) -> dict:
                 max_faces = face_count_in_frame
                 best_frame_drawn = drawn_frame
             
-            if frame_count % 30 == 0:
-                print(f"    Processed {frame_count} video frames")
+            if analyzed_count % 10 == 0:
+                print(f"    Analyzed {analyzed_count} frames (scanned {frame_count} total)")
                 
-            if frame_count >= 300: 
-                print("    Frame limit reached (300). Generating analytics report.")
+            if analyzed_count >= 60:  # 60 analyzed frames = 300 total frames scanned
+                print("    Frame limit reached. Generating analytics report.")
                 break
                 
         cap.release()
@@ -300,8 +318,7 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                 cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
                 try:
-                    from ultralytics import YOLO
-                    model = YOLO('yolov8m.pt')
+                    model = _get_yolo('yolov8m')
                     results = model(cv_img, conf=0.60)
                     
                     # Plot the results on the image (draws boxes and labels)
@@ -736,8 +753,7 @@ def _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url) 
     import cv2, numpy as np, os, tempfile
     try:
         print(f"    [GPU ENGINE] Initializing YOLOv8m (Medium) architecture into VRAM...")
-        from ultralytics import YOLO
-        model = YOLO('yolov8m.pt')
+        model = _get_yolo('yolov8m')
         use_yolo = True
         print(f"    [GPU ENGINE] High-Performance GPU Object Detection Active")
     except ImportError:
@@ -746,6 +762,8 @@ def _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url) 
         print(f"    [CPU ENGINE] Initializing Haar Cascade Fallback...")
 
     frame_count = total_faces = 0
+    SKIP = 3  # Only run detection every 3rd frame (3x speedup)
+    last_drawn = None
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps == 0.0 or np.isnan(fps):
@@ -764,27 +782,30 @@ def _run_face_detection_video(cap, tmp_path, file_obj, timestamp, save_and_url) 
             break
         frame_count += 1
         
-        if frame_count % 30 == 0:
-            print(f"    [GPU ENGINE] Processed frame {frame_count} | Tracking objects via YOLOv8")
+        if frame_count % SKIP == 0:
+            # Run actual detection on this frame
+            if use_yolo:
+                results = model(frame, verbose=False, conf=0.60)
+                face_count = len(results[0].boxes)
+                last_drawn = results[0].plot()
+            else:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
+                face_count = len(faces)
+                last_drawn = frame.copy()
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(last_drawn, (x, y), (x+w, y+h), (0, 255, 0), 4)
+                    cv2.putText(last_drawn, "AI: DETECTED", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            total_faces += face_count
         
-        if use_yolo:
-            results = model(frame, verbose=False, conf=0.60)
-            face_count = len(results[0].boxes)
-            drawn_frame = results[0].plot()
-        else:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(30, 30))
-            face_count = len(faces)
-            drawn_frame = frame.copy()
-            for (x, y, w, h) in faces:
-                cv2.rectangle(drawn_frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
-                cv2.putText(drawn_frame, "AI: DETECTED", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        
-        total_faces += face_count
-        
-        out.write(drawn_frame)
+        # Write either the freshly detected frame or the raw frame
+        out.write(last_drawn if last_drawn is not None else frame)
+
+        if frame_count % 90 == 0:
+            tracker_name = 'YOLOv8' if use_yolo else 'Haar cascade'
+            print(f"    [GPU ENGINE] Processed frame {frame_count} | Tracking via {tracker_name}")
             
-        # Optional timeout cap: 600 frames is ~20 seconds of video. Limits server timeout on massive files.
+        # Optional timeout cap: 600 frames is ~20 seconds of video
         if frame_count >= 600:
             print("    [GPU ENGINE] Frame limit reached (600). Generating finalized tracking stream.")
             break

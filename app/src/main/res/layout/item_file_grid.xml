@@ -101,20 +101,24 @@
                     android:id="@+id/btnDownload"
                     android:layout_width="34dp"
                     android:layout_height="34dp"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_nav_download"
                     app:tint="@color/primary_color"
-                    android:contentDescription="Download"/>
+                    android:contentDescription="@string/btn_download"/>
 
                 <ImageButton
                     android:id="@+id/btnView"
                     android:layout_width="34dp"
                     android:layout_height="34dp"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:layout_marginStart="6dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_eye"
                     app:tint="@color/primary_color"
-                    android:contentDescription="View in folder"/>
+                    android:contentDescription="@string/btn_view_in_folder"/>
             </LinearLayout>
 
         </LinearLayout>

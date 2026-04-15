@@ -40,3 +40,8 @@ google-services.json
 firebase-debug.log
 .vscode/
 *.pt
+
+# Debug / temp logs
+crash.log
+log_check.txt
+app/build/

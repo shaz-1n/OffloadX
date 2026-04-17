@@ -66,13 +66,29 @@ class ChangePasswordFragment : Fragment() {
 
                 user.updatePassword(newPass)
                     .addOnCompleteListener { task ->
+                        // Guard: fragment may be detached before the async callback fires
+                        if (!isAdded) return@addOnCompleteListener
+
                         if (task.isSuccessful) {
-                            Toast.makeText(requireContext(), "Password updated successfully!", Toast.LENGTH_SHORT).show()
-                            // Go back
-                            requireActivity().onBackPressedDispatcher.onBackPressed()
+                            context?.let { ctx ->
+                                Toast.makeText(ctx, "Password updated successfully!", Toast.LENGTH_SHORT).show()
+                            }
+                            // Go back safely
+                            activity?.onBackPressedDispatcher?.onBackPressed()
                         } else {
-                            val error = task.exception?.message ?: "Failed to update password"
-                            Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show()
+                            val errorMsg = task.exception?.message ?: "Failed to update password"
+                            // Firebase requires recent login for sensitive operations
+                            val friendlyMsg = when {
+                                errorMsg.contains("recent", ignoreCase = true) ||
+                                errorMsg.contains("credential", ignoreCase = true) ->
+                                    "For security, please log out and log back in before changing your password."
+                                errorMsg.contains("weak", ignoreCase = true) ->
+                                    "Password is too weak. Use at least 6 characters with a number."
+                                else -> errorMsg
+                            }
+                            context?.let { ctx ->
+                                Toast.makeText(ctx, friendlyMsg, Toast.LENGTH_LONG).show()
+                            }
                         }
                         btnUpdatePassword?.isEnabled = true
                         btnUpdatePassword?.text = "Update"

@@ -6,7 +6,7 @@ echo ========================================================
 echo Setting up OffloadX Local Cloud Server...
 echo ========================================================
 
-REM Check if venv exists
+REM Check if venv exists, create if not
 if not exist "venv" (
     echo Creating virtual environment...
     python -m venv venv
@@ -15,7 +15,10 @@ if not exist "venv" (
 REM Activate venv
 call venv\Scripts\activate.bat
 
-echo Installing dependencies...
+echo Ensuring pip is up to date...
+python -m pip install --upgrade pip
+
+echo Installing/Verifying dependencies...
 pip install -r requirements.txt
 
 echo Applying migrations...

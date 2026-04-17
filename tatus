@@ -1,0 +1,241 @@
+[33mcommit 066c43719d1d2625d2807851077d1de63bd4d08a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Merge: e434cd4 c47b9ac
+Author: shaz in <shaz786u@gmail.com>
+Date:   Wed Apr 15 23:53:42 2026 +0530
+
+    Merge branch 'NithinS102005:main' into main
+
+[33mcommit c47b9ac476a12c41fb1870d57a07c2f853951c57[m
+Merge: 3a86fd1 80a9aed
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Wed Apr 15 13:59:33 2026 +0530
+
+    Merge pull request #14 from Pratik0182/features/backend
+    
+    comprehensive memory leaks, download sync, and accessibility overhaul
+
+[33mcommit 80a9aed954628a39f1538d02365f741a87d49621[m
+Merge: cdb3350 3a86fd1
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Wed Apr 15 13:50:10 2026 +0530
+
+    Merge branch 'NithinS102005:main' into features/backend
+
+[33mcommit cdb3350b1e6328789460e3b475d4e4101cf73a97[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Wed Apr 15 13:49:12 2026 +0530
+
+    fixed memory leaks, download sync,a nd overall accessibility
+
+[33mcommit ea3d7d85b355700ac6393943b857e097753d6644[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Wed Apr 15 13:48:21 2026 +0530
+
+    fixed memory leaks, download sync
+    
+    ui freezing for large file >2GB; ensures safe file overwrited. fixed string references and removed deprecated layout parameters
+
+[33mcommit 3a86fd135032bbeda922ce5cd21a89dbb299f8d3[m
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 16:40:07 2026 +0530
+
+    Update README to use HTML for images
+
+[33mcommit 1ba65c344dc07dce31cc78cb0dbbf95b946e81f5[m
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 16:37:06 2026 +0530
+
+    Add contributing guidelines to CONTRIBUTING.md
+
+[33mcommit a83d50c9103e4bc855393feed66a0cad21f83093[m
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 16:23:16 2026 +0530
+
+    feature template edit
+    
+    Updated feature request template to include default title and labels.
+
+[33mcommit a271e5c4ca95702141812c1e973f96f20c23687a[m
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 16:22:30 2026 +0530
+
+    edited bugreport
+
+[33mcommit f5cb2d37e5b29ec250c9e1fdc8ed4de50f4b8239[m
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 16:20:20 2026 +0530
+
+    Update issue templates
+
+[33mcommit b75a88d1689e6ad46942324cb44179a52aa7daa6[m
+Merge: 29003fb 273e9d1
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 15:48:38 2026 +0530
+
+    Merge pull request #12 from Pratik0182/offloading
+    
+    offloading works, fixed object detection, fixed bug for grid view and other things idk
+
+[33mcommit 273e9d17bab8b98b6d37f549f921d53a088f20a0[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Sun Apr 12 15:28:53 2026 +0530
+
+    offloading works, fixed object detection, fixed bug for grid view and other bugs
+
+[33mcommit 29003fb8ac178c643d32f548b80711e05a4c9af2[m
+Author: shaz in <shaz786u@gmail.com>
+Date:   Sat Apr 11 22:46:14 2026 +0530
+
+    Enhance stats dashboard and optimize UI and backend performance (#11)
+    
+    * enchanced stats dashboard, profile ui improvements, and optimized connectivty
+    
+    * complete updates for offloadx: ui refinements, backend image processing modes, and sqlite performance logging
+
+[33mcommit e434cd424dadd7a16362a0b45fbd69335592825d[m
+Merge: 358bf0e a5a7bf1
+Author: shaz in <shaz786u@gmail.com>
+Date:   Sat Apr 11 22:44:08 2026 +0530
+
+    Merge branch 'NithinS102005:main' into main
+
+[33mcommit 358bf0ee949c36e9b23b4e014692bc1dbd041691[m
+Author: shazin <shaz786u@gmail.com>
+Date:   Thu Apr 9 22:58:32 2026 +0530
+
+    complete updates for offloadx: ui refinements, backend image processing modes, and sqlite performance logging
+
+[33mcommit ffff6c1d459a979d4b061b862dff9643a7eabf5f[m
+Author: shazin <shaz786u@gmail.com>
+Date:   Fri Mar 27 01:06:20 2026 +0530
+
+    enchanced stats dashboard, profile ui improvements, and optimized connectivty
+
+[33mcommit a5a7bf1703cdf228118992d26b5a478184a13972[m
+Merge: 845dab0 4538cee
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Thu Apr 9 23:26:55 2026 +0530
+
+    Merge pull request #10 from shaz-1n/main
+    
+    database, cloud offloading features, ui improvement and idk some more things
+
+[33mcommit 4538ceee1c395f271e20f6ae3a5c73688039d964[m
+Author: shazin <shaz786u@gmail.com>
+Date:   Thu Apr 9 22:58:32 2026 +0530
+
+    Complete updates for OffloadX: UI refinements, backend image processing modes, and SQLite performance logging
+
+[33mcommit 8d91eeecb4d5cd184ee807e4ac07b5e2767e7ade[m
+Author: shazin <shaz786u@gmail.com>
+Date:   Fri Mar 27 01:06:20 2026 +0530
+
+    march 20
+
+[33mcommit 845dab03121d64966d3af53f40cd8400f270de3a[m[33m ([m[1;31mupstream/main[m[33m, [m[1;31mupstream/HEAD[m[33m)[m
+Merge: e56b894 53da055
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Thu Apr 9 23:07:35 2026 +0530
+
+    Merge pull request #9 from Pratik0182/files_and_connectivity
+    
+    ui changes and file management
+
+[33mcommit 53da05585cd3d21fa163d52ab9db7956f0b7d783[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Thu Apr 9 23:02:16 2026 +0530
+
+    ui changes and file management
+
+[33mcommit e56b894257163b4a5d4a6bab93fe4233faad95e8[m
+Merge: 6aaa229 5e631ac
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Fri Mar 20 12:50:52 2026 +0530
+
+    Merge pull request #8 from Pratik0182/files_and_connectivity
+    
+    added edge node, download tab organized and connectivity fixed
+
+[33mcommit 5e631ac35fc1dcf62dedf3996ecef69c3f94a855[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Fri Mar 20 12:46:10 2026 +0530
+
+    added edge node, download tab organized and connectivity fixed
+
+[33mcommit 6aaa22966241877b729f0f484b8f8aa26c782c9c[m[33m ([m[1;31mpratik/main[m[33m, [m[1;31mpratik/HEAD[m[33m)[m
+Merge: 68f1865 cf07014
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Tue Mar 17 02:16:10 2026 +0530
+
+    Merge branch 'NithinS102005:main' into main
+
+[33mcommit 68f186595feeab4bb4b901dcf0e755b1ea327691[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Tue Mar 17 02:12:10 2026 +0530
+
+    offloading video(object detection testing)
+
+[33mcommit cf07014c391c81dde06ed6e0781d57c404a356c4[m
+Merge: 9f08e1b 699c10f
+Author: NithinS102005 <231210078@nitdelhi.ac.in>
+Date:   Tue Mar 17 01:12:45 2026 +0530
+
+    added graphs to stats and changed theme colour
+
+[33mcommit 9f08e1b84d2b38f606aeb5106e59d983a171049f[m
+Author: NithinS102005 <231210078@nitdelhi.ac.in>
+Date:   Tue Mar 17 01:08:00 2026 +0530
+
+    changed theme colour and added graphs in stats
+
+[33mcommit 699c10f8a138edeaa2b486b7cec1d9eebc1206a1[m
+Merge: b632436 80aadf6
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Tue Mar 17 00:12:34 2026 +0530
+
+    Merge pull request #6 from Pratik0182/main
+    
+    google auth, firebase login and djago admin for cloud processing
+
+[33mcommit 80aadf6fa848ffd6b50ce1db428dd65d78899b43[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Tue Mar 17 00:11:28 2026 +0530
+
+    google auth, firebase login and djago admin for cloud processing
+
+[33mcommit b6324360d730906fb98cfb7c9f945740347801f6[m
+Author: NithinS102005 <231210078@nitdelhi.ac.in>
+Date:   Fri Mar 13 01:57:42 2026 +0530
+
+    major frontend
+
+[33mcommit fc7b2506b1d09918f927721803b0baa27f7e6f42[m
+Merge: 46a8de1 62d5b19
+Author: pratik <pkumarjee2006@gmail.com>
+Date:   Fri Feb 13 12:55:45 2026 +0530
+
+    Merge pull request #5 from Pratik0182/main
+    
+    file upload, removed pycache and optimization
+
+[33mcommit 62d5b192275671bcdc7b9b399a3edc0826474f95[m
+Merge: 0292531 46a8de1
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Fri Feb 13 12:52:12 2026 +0530
+
+    Merge branch 'main' of https://github.com/Pratik0182/OffloadX
+
+[33mcommit 0292531b194a4f72c574a160dfbdb21e11ee07eb[m
+Author: Pratik Kumar Singh <pkumarjee2006@gmail.com>
+Date:   Fri Feb 13 12:47:11 2026 +0530
+
+    Update .gitignore: Exclude Python caches and secrets
+
+[33mcommit 46a8de1c0f379746e53e7bd588ffda0979721ea1[m
+Merge: 43d3da0 2796ce8
+Author: NithinS102005 <231210078@nitdelhi.ac.in>
+Date:   Fri Feb 13 12:44:35 2026 +0530
+
+    Merge branch 'main' of https://github.com/NithinS102005/OffloadX
+
+[33mcommit

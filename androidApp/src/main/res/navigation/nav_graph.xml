@@ -1,0 +1,36 @@
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/navigation_upload">
+
+    <fragment
+        android:id="@+id/navigation_upload"
+        android:name="com.example.offload.ui.main.UploadFragment"
+        android:label="Upload"
+        tools:layout="@layout/fragment_upload" />
+
+    <fragment
+        android:id="@+id/navigation_download"
+        android:name="com.example.offload.ui.main.DownloadFragment"
+        android:label="Download"
+        tools:layout="@layout/fragment_download" />
+
+    <fragment
+        android:id="@+id/navigation_stats"
+        android:name="com.example.offload.ui.main.StatsFragment"
+        android:label="Statistics"
+        tools:layout="@layout/fragment_stats" />
+
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.example.offload.ui.main.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
+
+    <fragment
+        android:id="@+id/changePasswordFragment"
+        android:name="com.example.offload.ui.auth.ChangePasswordFragment"
+        android:label="Change Password"
+        tools:layout="@layout/fragment_change_password" />
+</navigation>

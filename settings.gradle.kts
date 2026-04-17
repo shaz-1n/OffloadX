@@ -21,5 +21,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Offload"
-include(":app")
+include(":androidApp")
  

@@ -42,9 +42,12 @@ class ComputeTask(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     processing_time_ms = models.FloatField(null=True, blank=True, help_text="Processing duration in milliseconds")
 
-    # Firebase reference where the result was pushed
+    # File references
     firebase_result_path = models.CharField(max_length=512, blank=True, default='',
                                             help_text="Firestore/Storage path where result was saved")
+    processed_result_url = models.CharField(max_length=1024, blank=True, default='',
+                                            help_text="Local Hub URL for the processed file result")
+
 
     error_message = models.TextField(blank=True, default='')
 

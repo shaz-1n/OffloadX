@@ -143,6 +143,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         val isDark = prefs.getBoolean("dark_mode", AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES)
         switch.isChecked = isDark
 
+
         switch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("dark_mode", isChecked).apply()
             if (isChecked) {
@@ -152,13 +153,43 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             }
         }
 
-        // --- Change Password (Navigate to Fragment) ---
+        // --- Change Password ---
         btnPass.setOnClickListener {
-            try {
-                findNavController().navigate(R.id.changePasswordFragment)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Navigation Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            val input = EditText(requireContext())
+            input.hint = "New Password (min 6 chars)"
+            input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            val container = LinearLayout(requireContext())
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.setMargins(60, 20, 60, 20)
+            input.layoutParams = params
+            container.addView(input)
+
+            AlertDialog.Builder(requireContext())
+                .setTitle("Change Password")
+                .setMessage("Enter a new password:")
+                .setView(container)
+                .setPositiveButton("Update") { _, _ ->
+                    val newPass = input.text.toString()
+                    if (newPass.length < 6) {
+                        Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
+                    } else {
+                        user?.updatePassword(newPass)?.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Toast.makeText(context, "Password updated successfully!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val errorMsg = task.exception?.message ?: "Failed to update password"
+                                val friendlyMsg = if (errorMsg.contains("recent", ignoreCase = true) || errorMsg.contains("credential", ignoreCase = true)) {
+                                    "Please log out and log back in before changing your password."
+                                } else errorMsg
+                                Toast.makeText(context, friendlyMsg, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
 
         // --- Edit Profile Name ---

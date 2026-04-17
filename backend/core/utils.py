@@ -347,15 +347,15 @@ def _process_image_file(file_obj, image_mode: str = 'GRAYSCALE',
                 _, enc = cv2.imencode('.jpg', cv_img)
                 out_name = f"processed_{timestamp}_{image_mode.lower()}_{file_obj.name}"
                 file_url = _save_and_url(enc.tobytes(), out_name)
-                mode_label = f'Object Detection ({len(faces)} found)'
-                print(f"    Object Detection: {len(faces)} face(s) found.")
+                mode_label = f'Object Detection ({num_objects} found)'
+                print(f"    Object Detection: {num_objects} object(s) found.")
                 return {
                     'status': 'success',
                     'original_name': file_obj.name,
                     'processed_url': file_url,
                     'file_type': 'image',
                     'mode': mode_label,
-                    'objects_detected': int(len(faces)),
+                    'objects_detected': int(num_objects),
                     'dimensions': f"{image.width}x{image.height}",
                 }
 

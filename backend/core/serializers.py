@@ -16,9 +16,10 @@ class ComputeTaskSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'device_id', 'task_type', 'status',
             'received_at', 'processing_started_at', 'completed_at',
-            'processing_time_ms', 'firebase_result_path',
+            'processing_time_ms', 'firebase_result_path', 'processed_result_url',
             'error_message', 'logs',
         ]
+
         read_only_fields = [
             'id', 'status', 'received_at', 'processing_started_at',
             'completed_at', 'processing_time_ms', 'firebase_result_path',

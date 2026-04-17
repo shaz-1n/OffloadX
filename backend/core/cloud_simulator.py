@@ -140,9 +140,12 @@ def simulate_cloud_image(file_obj, image_mode: str = 'GRAYSCALE',
         return result
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {
             'status': 'error',
             'error': str(e),
+            'processed_url': '',  # Ensure key exists to avoid app-side crashes
             'cloud_overhead_ms': round(cloud_overhead_s * 1000, 1),
             'provider': 'Cloud Function (simulated)',
         }

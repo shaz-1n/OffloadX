@@ -110,7 +110,14 @@ class StatsFragment : Fragment() {
         // Observe files for real statistics
         viewModel.downloadableFiles.observe(viewLifecycleOwner) { files ->
             updateStatistics(files)
-            setupChart(files)
+        }
+
+        // Load chart from DB (more reliable — includes all tasks with timing)
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val recentLogs = logRepo.getRecentLogs(6)
+            withContext(Dispatchers.Main) {
+                if (isAdded) setupChartFromLogs(recentLogs)
+            }
         }
 
         // Ping button
@@ -137,6 +144,13 @@ class StatsFragment : Fragment() {
         super.onResume()
         if (btnPingNode != null) {
             pingEdgeNode()
+        }
+        // Refresh chart whenever the tab is revisited
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val recentLogs = logRepo.getRecentLogs(6)
+            withContext(Dispatchers.Main) {
+                if (isAdded) setupChartFromLogs(recentLogs)
+            }
         }
     }
 
@@ -177,51 +191,81 @@ class StatsFragment : Fragment() {
     }
 
     private fun setupChart(files: List<FileModel>) {
+        // This is now a fallback only — setupChartFromLogs() is called on resume
+        val chart = performanceChart ?: return
+        if (files.isEmpty()) {
+            chart.clear()
+            chart.invalidate()
+        }
+    }
+
+    /**
+     * Builds the "Processing Time by Task" bar chart from SQLite log entries.
+     * These entries are written at the END of every task (LOCAL/HUB/CLOUD)
+     * and are guaranteed to have a valid elapsed_ms > 0.
+     */
+    private fun setupChartFromLogs(logs: List<OffloadLogRepository.LogRow>) {
         val chart = performanceChart ?: return
         chart.description.isEnabled = false
         chart.setDrawGridBackground(false)
         chart.legend.isEnabled = true
         chart.setTouchEnabled(true)
 
-        val tasksWithTime = files.filter { it.processingTimeMs > 0 }.takeLast(6)
+        // Filter to entries that have useful timing
+        val tasksWithTime = logs.filter { it.elapsedMs > 0 }.takeLast(6)
 
         if (tasksWithTime.isEmpty()) {
             val entries = arrayListOf(BarEntry(0f, 0f))
-            val dataSet = BarDataSet(entries, "No data yet")
-            dataSet.color = ContextCompat.getColor(requireContext(), R.color.input_stroke_color)
+            val dataSet = BarDataSet(entries, "No data yet — upload a file to see timings")
+            dataSet.color = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.input_stroke_color)
             chart.data = BarData(dataSet)
             chart.invalidate()
             return
         }
 
         val entries = ArrayList<BarEntry>()
-        val labels = ArrayList<String>()
+        val labels  = ArrayList<String>()
 
-        tasksWithTime.forEachIndexed { index, file ->
-            entries.add(BarEntry(index.toFloat(), file.processingTimeMs.toFloat()))
-            val shortName = file.fileName.take(8).replace("_", " ")
-            labels.add(shortName)
+        tasksWithTime.forEachIndexed { idx, log ->
+            val timeVal = log.elapsedMs.toFloat()
+            entries.add(BarEntry(idx.toFloat(), timeVal))
+            // Show task name (truncated) + node abbreviation
+            val nodeBadge = when (log.processingNode) {
+                "LOCAL" -> "L"
+                "HUB"   -> "H"
+                "CLOUD" -> "C"
+                else    -> "?"
+            }
+            val shortName = log.taskName.take(7).trimEnd()
+            labels.add("$shortName[$nodeBadge]")
         }
 
         val dataSet = BarDataSet(entries, "Processing Time (ms)")
-        dataSet.color = ContextCompat.getColor(requireContext(), R.color.primary_color)
-        dataSet.valueTextColor = ContextCompat.getColor(requireContext(), R.color.text_primary)
+        dataSet.color = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.primary_color)
+        dataSet.valueTextColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_primary)
         dataSet.valueTextSize = 10f
+        // Format values as "XXms" or "X.Xs"
+        dataSet.valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+            override fun getFormattedValue(value: Float): String {
+                return if (value >= 1000f) "${"%,.1f".format(value / 1000f)}s" else "${value.toLong()}ms"
+            }
+        }
 
         val xAxis = chart.xAxis
         xAxis.position = XAxis.XAxisPosition.BOTTOM
         xAxis.setDrawGridLines(false)
         xAxis.valueFormatter = IndexAxisValueFormatter(labels)
         xAxis.granularity = 1f
-        xAxis.textSize = 10f
-        xAxis.textColor = ContextCompat.getColor(requireContext(), R.color.text_secondary)
+        xAxis.textSize = 9f
+        xAxis.textColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_secondary)
         xAxis.labelRotationAngle = -30f
+        xAxis.labelCount = labels.size
 
         chart.axisLeft.apply {
             setDrawGridLines(true)
-            gridColor = ContextCompat.getColor(requireContext(), R.color.input_stroke_color)
+            gridColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.input_stroke_color)
             axisMinimum = 0f
-            textColor = ContextCompat.getColor(requireContext(), R.color.text_secondary)
+            textColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.text_secondary)
         }
         chart.axisRight.isEnabled = false
 
